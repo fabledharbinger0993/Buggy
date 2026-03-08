@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>ArchiveLens Results</title>
+    <script src="../lib/d3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs" type="module"></script>
+    <style>
+      :root {
+        --bg: #f8f9f2;
+        --ink: #112229;
+        --line: #d4ddd8;
+        --accent: #1f6f6c;
+        --warn: #b4493a;
+      }
+      body {
+        margin: 0;
+        font-family: "Source Sans 3", "Segoe UI", sans-serif;
+        color: var(--ink);
+        background: linear-gradient(120deg, #eef4f1 0%, #f8f9f2 42%, #f2ede4 100%);
+      }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--line);
+        backdrop-filter: blur(4px);
+        position: sticky;
+        top: 0;
+        background: rgba(248, 249, 242, 0.9);
+        z-index: 5;
+      }
+      nav {
+        display: flex;
+        gap: 8px;
+      }
+      nav button {
+        border: 1px solid var(--line);
+        background: #fff;
+        border-radius: 999px;
+        padding: 7px 12px;
+        cursor: pointer;
+      }
+      nav button.active {
+        background: var(--accent);
+        color: #fff;
+      }
+      .pane {
+        display: none;
+        padding: 16px;
+      }
+      .pane.active {
+        display: block;
+      }
+      #graph {
+        height: 72vh;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #fff;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #fff;
+      }
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 8px;
+        text-align: left;
+        vertical-align: top;
+      }
+      .pill {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 12px;
+      }
+      .uncorroborated {
+        background: #fce9e6;
+        color: var(--warn);
+      }
+      .single-source {
+        background: #f1efde;
+        color: #6f630a;
+      }
+      .corroborated {
+        background: #dff4ee;
+        color: #0e5e44;
+      }
+      .warning {
+        border-left: 4px solid var(--warn);
+        padding-left: 10px;
+      }
+      .disclaimer {
+        font-size: 12px;
+        opacity: 0.75;
+      }
+      @media (max-width: 900px) {
+        #graph {
+          height: 58vh;
+        }
+        th,
+        td {
+          font-size: 13px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <h1 id="title" style="margin:0">ArchiveLens Results</h1>
+        <div class="disclaimer">Model-estimated relevance, not statistically calibrated.</div>
+      </div>
+      <nav>
+        <button data-tab="graphPane" class="active">Vein Diagram</button>
+        <button data-tab="citationsPane">Citation Log</button>
+        <button data-tab="briefPane">Subject Context Brief</button>
+      </nav>
+    </header>
+
+    <section id="graphPane" class="pane active">
+      <div style="display:flex; gap:8px; margin-bottom:8px;">
+        <button id="exportGraphJson">Export JSON</button>
+        <button id="exportGraphPng">Export PNG</button>
+      </div>
+      <div id="graph"></div>
+    </section>
+
+    <section id="citationsPane" class="pane">
+      <div style="display:flex; gap:8px; margin-bottom:8px;">
+        <button id="exportCsv">Export CSV</button>
+        <button id="exportMd">Export Markdown</button>
+      </div>
+      <table id="citationTable">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Archive</th>
+            <th>URL</th>
+            <th>Date</th>
+            <th>Summary</th>
+            <th>Entities</th>
+            <th>Relevance</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <section id="briefPane" class="pane">
+      <h2>Timeline</h2>
+      <ul id="timeline"></ul>
+      <h2>Cast</h2>
+      <ul id="cast"></ul>
+      <h2>Sub-plots</h2>
+      <ul id="subplots"></ul>
+      <h2>Follow-up Search Directives</h2>
+      <ul id="directives"></ul>
+      <h2>Unresolved Inconsistencies</h2>
+      <ul id="inconsistencies"></ul>
+    </section>
+
+    <script type="module" src="results.js"></script>
+  </body>
+</html>

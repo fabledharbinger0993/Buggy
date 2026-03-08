@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>ArchiveLens</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <h1>ArchiveLens</h1>
+      <label>Primary Subject
+        <input id="subject" type="text" placeholder="Name, operation, or event" />
+      </label>
+      <label>Context Cues
+        <textarea id="contextCue" rows="3" placeholder="Aliases, date ranges, thematic clues"></textarea>
+      </label>
+
+      <fieldset>
+        <legend>Archives</legend>
+        <div id="sources"></div>
+      </fieldset>
+
+      <label>Depth
+        <input id="depth" type="number" min="1" max="5" value="2" />
+      </label>
+
+      <div class="actions">
+        <button id="startSearch">Search Archives</button>
+        <button id="startDeepCrawl">Deep Crawl Active Page</button>
+      </div>
+
+      <div class="actions">
+        <button id="openResults">Open Results Panel</button>
+        <button id="openSessions">Sessions</button>
+        <button id="openSettings">Settings</button>
+      </div>
+
+      <p id="status" class="status"></p>
+      <p class="disclaimer">Model-estimated relevance, not statistically calibrated.</p>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

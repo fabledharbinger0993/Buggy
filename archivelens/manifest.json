@@ -1,0 +1,53 @@
+{
+  "manifest_version": 3,
+  "name": "ArchiveLens",
+  "description": "Intelligent archival research assistant with local Ollama inference.",
+  "version": "1.0.0",
+  "minimum_chrome_version": "120",
+  "action": {
+    "default_title": "ArchiveLens",
+    "default_popup": "popup/popup.html"
+  },
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+  "permissions": [
+    "activeTab",
+    "tabs",
+    "storage",
+    "scripting",
+    "downloads",
+    "notifications"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*",
+    "http://localhost:11434/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "content/content-script.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_page": "settings/settings.html",
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "panel/*",
+        "lib/*"
+      ],
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ]
+    }
+  ]
+}

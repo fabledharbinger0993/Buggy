@@ -1,0 +1,92 @@
+:root {
+  --bg: #f4f1e8;
+  --ink: #192227;
+  --accent: #0f6d66;
+  --accent-2: #d9663f;
+  --card: #fffdf8;
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(circle at top right, #fcefd5 0%, var(--bg) 48%, #e6ece9 100%);
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  color: var(--ink);
+  width: 360px;
+}
+
+.shell {
+  padding: 14px;
+}
+
+h1 {
+  margin: 0 0 8px;
+  font-family: "Space Grotesk", "Avenir Next", sans-serif;
+  letter-spacing: 0.02em;
+}
+
+label,
+fieldset {
+  display: block;
+  margin-bottom: 10px;
+}
+
+input,
+textarea {
+  width: 100%;
+  margin-top: 4px;
+  border: 1px solid #aab8b1;
+  border-radius: 8px;
+  padding: 8px;
+  box-sizing: border-box;
+  background: var(--card);
+}
+
+fieldset {
+  border: 1px solid #b5c3bc;
+  border-radius: 10px;
+}
+
+#sources label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+button {
+  border: 0;
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  flex: 1;
+}
+
+button:hover {
+  background: #0b5a55;
+}
+
+.actions button:nth-child(2) {
+  background: var(--accent-2);
+}
+
+.actions button:nth-child(2):hover {
+  background: #bf522d;
+}
+
+.status {
+  min-height: 18px;
+  font-size: 12px;
+}
+
+.disclaimer {
+  font-size: 11px;
+  opacity: 0.8;
+}
