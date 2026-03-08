@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ArchiveLens — Results</title>
+  <style>
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #14171e;
+      --bg2: #1c2029;
+      --bg3: #252a36;
+      --accent: #4f9cf9;
+      --accent2: #6fcf97;
+      --warn: #f2994a;
+      --danger: #eb5757;
+      --text: #e4e8f0;
+      --text2: #8b95a8;
+      --border: #2e3444;
+      --radius: 6px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    #header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    #header h1 {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--accent);
+      flex: 1;
+    }
+
+    #session-title {
+      font-size: 13px;
+      color: var(--text2);
+    }
+
+    .btn {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 5px 10px;
+      transition: background 0.15s;
+    }
+    .btn:hover { background: var(--border); }
+    .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn-primary:hover { background: #3b87e8; }
+
+    /* ── Tab bar ── */
+    #tab-bar {
+      display: flex;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .result-tab {
+      padding: 9px 18px;
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--text2);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .result-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .result-tab:hover:not(.active) { color: var(--text); }
+
+    /* ── Content area ── */
+    #content {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .result-panel {
+      display: none;
+      height: 100%;
+      overflow: auto;
+      padding: 16px;
+    }
+    .result-panel.active { display: block; }
+
+    /* ── Graph panel ── */
+    #panel-graph {
+      padding: 0;
+      position: relative;
+    }
+
+    #graph-container {
+      width: 100%;
+      height: 100%;
+      background: var(--bg);
+    }
+
+    #graph-container svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    #graph-controls {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    #graph-legend {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      background: rgba(28, 32, 41, 0.9);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px 10px;
+      font-size: 11px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 3px;
+    }
+
+    .legend-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* ── Citation log ── */
+    #panel-citations table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    #panel-citations th {
+      text-align: left;
+      padding: 6px 8px;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      color: var(--text2);
+      font-weight: 600;
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    #panel-citations th:hover { color: var(--accent); }
+
+    #panel-citations td {
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    #panel-citations tr:hover td { background: var(--bg2); }
+
+    .score-badge {
+      display: inline-block;
+      padding: 1px 5px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .score-high { background: rgba(111, 207, 151, 0.2); color: var(--accent2); }
+    .score-med  { background: rgba(79, 156, 249, 0.2); color: var(--accent); }
+    .score-low  { background: rgba(139, 149, 168, 0.2); color: var(--text2); }
+
+    .status-ok            { color: var(--accent2); }
+    .status-access-denied { color: var(--danger); }
+    .status-error         { color: var(--warn); }
+
+    .corr-corroborated  { color: var(--accent2); }
+    .corr-single-source { color: var(--warn); }
+    .corr-uncorroborated{ color: var(--danger); }
+
+    #citation-toolbar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+      align-items: center;
+    }
+
+    #citation-search {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-size: 12px;
+      padding: 5px 8px;
+      flex: 1;
+      outline: none;
+    }
+    #citation-search:focus { border-color: var(--accent); }
+
+    #threshold-label {
+      font-size: 11px;
+      color: var(--text2);
+      white-space: nowrap;
+    }
+
+    /* ── Context brief ── */
+    #panel-brief {
+      max-width: 860px;
+    }
+
+    .brief-section {
+      margin-bottom: 24px;
+    }
+
+    .brief-section h2 {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 10px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .brief-narrative {
+      line-height: 1.7;
+      color: var(--text);
+    }
+
+    .timeline-entry {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 10px;
+      padding-left: 8px;
+      border-left: 2px solid var(--accent);
+    }
+
+    .timeline-date {
+      font-weight: 600;
+      color: var(--accent);
+      white-space: nowrap;
+      min-width: 90px;
+    }
+
+    .cast-entry {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px 10px;
+      margin-bottom: 6px;
+    }
+
+    .cast-name { font-weight: 600; color: var(--text); }
+    .cast-role { font-size: 11px; color: var(--text2); margin-top: 2px; }
+
+    .inconsistency-entry {
+      background: rgba(235, 87, 87, 0.1);
+      border: 1px solid var(--danger);
+      border-radius: var(--radius);
+      padding: 8px 10px;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+
+    .follow-up-btn {
+      display: inline-block;
+      margin: 3px;
+      padding: 4px 10px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      color: var(--accent);
+      cursor: pointer;
+      font-size: 12px;
+      transition: background 0.15s;
+    }
+    .follow-up-btn:hover { background: var(--border); }
+
+    /* ── Confidence disclaimer ── */
+    .confidence-note {
+      font-size: 11px;
+      color: var(--text2);
+      background: var(--bg2);
+      border-left: 3px solid var(--warn);
+      padding: 6px 10px;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      margin-bottom: 10px;
+    }
+
+    /* ── Loading spinner ── */
+    #loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      font-size: 14px;
+      color: var(--text2);
+      gap: 10px;
+    }
+
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Node tooltip ── */
+    #node-tooltip {
+      position: fixed;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px 10px;
+      font-size: 12px;
+      pointer-events: none;
+      max-width: 240px;
+      z-index: 1000;
+      display: none;
+    }
+
+    .tooltip-name { font-weight: 600; color: var(--text); }
+    .tooltip-type { font-size: 11px; color: var(--text2); }
+    .tooltip-role { font-size: 11px; color: var(--accent2); margin-top: 2px; }
+    .tooltip-flag { font-size: 11px; font-weight: 600; margin-top: 3px; }
+    .flag-discrepancy { color: var(--danger); }
+    .flag-consistent  { color: var(--accent2); }
+
+    /* ── Utility ── */
+    .hidden { display: none !important; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div id="header">
+    <h1>🔍 ArchiveLens</h1>
+    <span id="session-title">Loading…</span>
+    <div style="display:flex; gap:6px; margin-left:auto">
+      <button class="btn" id="btn-export-csv">Export CSV</button>
+      <button class="btn" id="btn-export-md">Export Markdown</button>
+      <button class="btn" id="btn-export-json">Export JSON</button>
+      <button class="btn" id="btn-export-png">Export Graph PNG</button>
+    </div>
+  </div>
+
+  <!-- Tab bar -->
+  <div id="tab-bar">
+    <button class="result-tab active" data-tab="graph">🕸️ Vein Diagram</button>
+    <button class="result-tab" data-tab="citations">📋 Citation Log</button>
+    <button class="result-tab" data-tab="brief">📄 Context Brief</button>
+  </div>
+
+  <!-- Content -->
+  <div id="content">
+
+    <!-- Loading overlay -->
+    <div id="loading">
+      <div class="spinner"></div>
+      <span>Loading session data…</span>
+    </div>
+
+    <!-- Graph panel -->
+    <div id="panel-graph" class="result-panel hidden">
+      <div id="graph-container"></div>
+      <div id="graph-controls">
+        <button class="btn" id="btn-zoom-in">+</button>
+        <button class="btn" id="btn-zoom-out">−</button>
+        <button class="btn" id="btn-zoom-fit">⊡</button>
+      </div>
+      <div id="graph-legend">
+        <div class="legend-item"><span class="legend-dot" style="background:#f9a84f"></span> Root subject</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#4f9cf9"></span> Person</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#6fcf97"></span> Organisation</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#bb87fc"></span> Location</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#eb5757"></span> Operation</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#8b95a8"></span> Other</div>
+        <hr style="border-color:#2e3444; margin:4px 0"/>
+        <div class="legend-item" style="gap:4px">
+          <span style="display:inline-block;width:20px;border-top:2px solid #6fcf97"></span> Corroborated
+        </div>
+        <div class="legend-item" style="gap:4px">
+          <span style="display:inline-block;width:20px;border-top:2px solid rgba(79,156,249,0.5)"></span> Single-source
+        </div>
+        <div class="legend-item" style="gap:4px">
+          <span style="display:inline-block;width:20px;border-top:2px dashed #eb5757"></span> Uncorroborated
+        </div>
+      </div>
+    </div>
+
+    <!-- Citation log panel -->
+    <div id="panel-citations" class="result-panel hidden">
+      <p class="confidence-note">
+        ⚠️ Relevance scores shown are <strong>model-estimated</strong> (self-assessed by the local
+        Ollama model) and are <em>not</em> statistically calibrated probabilities.
+      </p>
+      <div id="citation-toolbar">
+        <input type="text" id="citation-search" placeholder="Filter by title, entity, archive…" />
+        <label id="threshold-label">
+          Min score:
+          <input type="number" id="threshold-input" value="0.6" min="0" max="1" step="0.05"
+                 style="width:4rem; background:var(--bg3); border:1px solid var(--border); border-radius:4px; color:var(--text); padding:3px 5px" />
+        </label>
+      </div>
+      <table id="citation-table">
+        <thead>
+          <tr>
+            <th data-col="title">Title ↕</th>
+            <th data-col="archive">Archive ↕</th>
+            <th data-col="date">Date ↕</th>
+            <th data-col="relevanceScore">Score ↕</th>
+            <th data-col="corroboration">Corroboration ↕</th>
+            <th>Summary</th>
+            <th>Entities</th>
+          </tr>
+        </thead>
+        <tbody id="citation-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Context brief panel -->
+    <div id="panel-brief" class="result-panel hidden">
+      <p class="confidence-note">
+        ⚠️ This brief is AI-generated by the local Ollama model. All claims should be
+        independently verified against the source documents linked in the Citation Log.
+        Relevance scores are model-estimated, not statistically calibrated.
+      </p>
+
+      <div class="brief-section" id="brief-narrative-section">
+        <h2>Summary Narrative</h2>
+        <p class="brief-narrative" id="brief-narrative">Loading…</p>
+      </div>
+
+      <div class="brief-section" id="brief-timeline-section">
+        <h2>Timeline of Events</h2>
+        <div id="brief-timeline"></div>
+      </div>
+
+      <div class="brief-section" id="brief-cast-section">
+        <h2>Connected Persons &amp; Organisations</h2>
+        <div id="brief-cast"></div>
+      </div>
+
+      <div class="brief-section" id="brief-subplots-section">
+        <h2>Secondary Threads</h2>
+        <ul id="brief-subplots" style="padding-left:20px; line-height:1.8"></ul>
+      </div>
+
+      <div class="brief-section" id="brief-inconsistencies-section" style="display:none">
+        <h2>⚠️ Unresolved Inconsistencies</h2>
+        <div id="brief-inconsistencies"></div>
+      </div>
+
+      <div class="brief-section" id="brief-followup-section">
+        <h2>Follow-up Search Directives</h2>
+        <div id="brief-followups"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Node tooltip -->
+  <div id="node-tooltip">
+    <div class="tooltip-name" id="tooltip-name"></div>
+    <div class="tooltip-type" id="tooltip-type"></div>
+    <div class="tooltip-role" id="tooltip-role"></div>
+    <div class="tooltip-flag" id="tooltip-flag"></div>
+  </div>
+
+  <!-- D3.js (loaded from lib) -->
+  <script src="../lib/d3.min.js"></script>
+  <script src="graph.js" type="module"></script>
+  <script src="results.js" type="module"></script>
+</body>
+</html>

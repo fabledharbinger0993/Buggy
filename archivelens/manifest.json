@@ -1,0 +1,57 @@
+{
+  "manifest_version": 3,
+  "name": "ArchiveLens",
+  "version": "1.0.0",
+  "description": "Intelligent archival research assistant: crawls public declassified document repositories, extracts entities and relationships, and synthesizes findings via local Ollama inference.",
+  "permissions": [
+    "storage",
+    "tabs",
+    "activeTab",
+    "scripting",
+    "alarms",
+    "notifications"
+  ],
+  "host_permissions": [
+    "http://localhost:11434/*",
+    "https://www.theblackvault.com/*",
+    "https://www.cia.gov/*",
+    "https://wikileaks.org/*",
+    "https://nsarchive.gwu.edu/*",
+    "https://archive.org/*",
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content/content-script.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "ArchiveLens",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["panel/results.html", "panel/sessions.html", "settings/settings.html"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}

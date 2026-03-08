@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ArchiveLens</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="al-header">
+      <span class="al-logo">🔍 ArchiveLens</span>
+      <div class="al-header-actions">
+        <button id="btn-sessions" title="Research Sessions" aria-label="Sessions">📁</button>
+        <button id="btn-settings" title="Settings" aria-label="Settings">⚙️</button>
+      </div>
+    </header>
+
+    <!-- Mode tabs -->
+    <nav class="al-tabs" role="tablist">
+      <button class="al-tab active" data-mode="search" role="tab" aria-selected="true">Search</button>
+      <button class="al-tab" data-mode="deepcrawl" role="tab" aria-selected="false">Deep Crawl</button>
+    </nav>
+
+    <!-- Search mode panel -->
+    <section id="panel-search" class="al-panel active" aria-label="Search mode">
+
+      <div class="al-field">
+        <label for="search-query">Search subject</label>
+        <input
+          type="text"
+          id="search-query"
+          placeholder="Name, operation, event, topic…"
+          autocomplete="off"
+          spellcheck="false"
+        />
+      </div>
+
+      <div class="al-field">
+        <label for="context-cues">Context cues <span class="al-hint">(optional)</span></label>
+        <textarea
+          id="context-cues"
+          rows="2"
+          placeholder="Aliases, date range, related names, keywords…"
+        ></textarea>
+      </div>
+
+      <div class="al-field">
+        <label>Archives to search</label>
+        <div id="archive-list" class="al-archive-list" role="group" aria-label="Archive selection">
+          <!-- Populated by popup.js from settings -->
+          <span class="al-loading-text">Loading…</span>
+        </div>
+      </div>
+
+      <div class="al-field al-field-inline">
+        <label for="crawl-depth">Crawl depth</label>
+        <input type="number" id="crawl-depth" value="2" min="1" max="5" style="width:4rem" />
+      </div>
+
+      <button id="btn-search" class="al-btn al-btn-primary">
+        🔎 Search
+      </button>
+    </section>
+
+    <!-- Deep Crawl mode panel -->
+    <section id="panel-deepcrawl" class="al-panel" aria-label="Deep crawl mode">
+
+      <p class="al-info">
+        Crawl the <strong>current page</strong> and all linked documents up to the configured depth.
+      </p>
+
+      <div id="active-url" class="al-url-preview">Loading current URL…</div>
+
+      <div class="al-field al-field-inline">
+        <label for="deep-crawl-depth">Crawl depth</label>
+        <input type="number" id="deep-crawl-depth" value="2" min="1" max="5" style="width:4rem" />
+      </div>
+
+      <button id="btn-deep-crawl" class="al-btn al-btn-primary">
+        🕷️ Deep Crawl Page
+      </button>
+    </section>
+
+    <!-- Status / progress bar -->
+    <div id="al-status" class="al-status hidden" role="status" aria-live="polite">
+      <div class="al-progress-bar">
+        <div class="al-progress-fill" id="al-progress-fill"></div>
+      </div>
+      <span id="al-status-text">Starting…</span>
+    </div>
+
+    <!-- CAPTCHA warning -->
+    <div id="al-captcha-warning" class="al-warning hidden" role="alert">
+      <strong>⚠️ CAPTCHA detected</strong> on <span id="captcha-domain"></span>.
+      <br />Please resolve it manually in the browser tab, then click
+      <button id="btn-resume-captcha" class="al-btn al-btn-small">Resume</button>
+    </div>
+
+    <!-- Footer -->
+    <footer class="al-footer">
+      <button id="btn-open-results" class="al-btn al-btn-secondary al-btn-full hidden">
+        📊 Open Results Panel
+      </button>
+    </footer>
+  </div>
+
+  <script src="popup.js" type="module"></script>
+</body>
+</html>
