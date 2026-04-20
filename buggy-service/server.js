@@ -664,6 +664,78 @@ setInterval(async () => {
   }
 }, 5 * 60 * 1000);
 
+// ─── Congress Review (Skeptic / Advocate / Synthesizer) ──────────────────────
+//
+// Silent three-persona review of a completed research session. Same pattern as
+// RekitBox's run_tribunal — fire-and-forget from the caller, results stored in
+// the sessions table as congress_review metadata. Never throws to the client.
+//
+// POST /congress/review  { sessionId, subject, claimCount, entityCount, inconsistencyCount }
+
+async function _ollamaChat(system, userContent, settings) {
+  const endpoint = (settings.ollamaEndpoint || "http://localhost:11434/api/generate")
+    .replace("/api/generate", "/api/chat");
+  const model = settings.ollamaModel || "qwen2.5-coder:7b";
+  const resp = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model,
+      stream: false,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: userContent },
+      ],
+      options: { temperature: 0.1 },
+    }),
+    signal: AbortSignal.timeout(45_000),
+  });
+  const data = await resp.json();
+  return cleanJsonResponse((data?.message?.content || "").trim());
+}
+
+async function runSessionTribunal(sessionId, subject, stats, settings) {
+  const content = `Research subject: ${subject}\nClaims found: ${stats.claimCount}\nEntities found: ${stats.entityCount}\nInconsistencies: ${stats.inconsistencyCount}`;
+
+  const SKEPTIC = "You are the Skeptic reviewing an archival research session. Identify gaps, uncorroborated claims, bias risks, and data quality issues. Return ONLY valid JSON: {\"findings\":[],\"severity\":\"low|medium|high\",\"flags\":[]}";
+  const ADVOCATE = "You are the Advocate reviewing an archival research session. Identify strong signals, well-corroborated chains, and healthy research breadth. Return ONLY valid JSON: {\"findings\":[],\"health_score\":0.0,\"improvements\":[]}";
+  const SYNTHESIZER = "You are the Synthesizer reviewing an archival research session. Given Skeptic and Advocate findings, produce a balanced synthesis with next-step directives. Return ONLY valid JSON: {\"synthesis\":\"\",\"action_items\":[],\"memory_tags\":[]}";
+
+  let skeptic = {}, advocate = {};
+  try { skeptic = await _ollamaChat(SKEPTIC, content, settings); } catch { /* silent */ }
+  try { advocate = await _ollamaChat(ADVOCATE, content, settings); } catch { /* silent */ }
+
+  let synth = {};
+  try {
+    const synthContent = `${content}\n\nSkeptic: ${JSON.stringify(skeptic.findings || [])}\nAdvocate: ${JSON.stringify(advocate.findings || [])}`;
+    synth = await _ollamaChat(SYNTHESIZER, synthContent, settings);
+  } catch { /* silent */ }
+
+  // Persist to session as congress_review field
+  try {
+    const sessions = await getAll("sessions");
+    const session = sessions.find((s) => s.id === sessionId);
+    if (session) {
+      await put("sessions", {
+        ...session,
+        congress_review: { skeptic, advocate, synthesizer: synth, reviewedAt: Date.now() },
+        lastModified: Date.now(),
+      });
+    }
+  } catch { /* silent */ }
+}
+
+app.post("/congress/review", async (req, res) => {
+  // Return immediately — tribunal runs in background
+  res.json({ ok: true });
+  try {
+    const { sessionId, subject = "unknown", claimCount = 0, entityCount = 0, inconsistencyCount = 0 } = req.body || {};
+    if (!sessionId) return;
+    const s = await getSettings();
+    runSessionTribunal(sessionId, subject, { claimCount, entityCount, inconsistencyCount }, s).catch(() => {});
+  } catch { /* silent */ }
+});
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 
 app.listen(PORT, () => {

@@ -229,8 +229,8 @@ export async function remove(storeName, key) {
 
 export function getDefaultSettings() {
   return {
-    ollamaEndpoint: "http://localhost:11434/api/generate",
-    ollamaModel: "llama3",
+    ollamaEndpoint: process.env.BUGGY_OLLAMA_URL || "http://localhost:11434/api/generate",
+    ollamaModel: process.env.BUGGY_AGENT_MODEL || "qwen2.5-coder:7b",
     confidenceThreshold: 0.6,
     crawlDepth: 2,
     crawlDelaySeconds: 3,
