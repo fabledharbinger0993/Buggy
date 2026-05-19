@@ -34,6 +34,32 @@ export const OLLAMA_PROMPTS = {
       "Output raw JSON only."
     ].join(" "),
     userTemplate: ({ entityA, entityB, context }) => `Entity A: ${entityA}\nEntity B: ${entityB}\nContext:\n${JSON.stringify(context)}\n\nReturn JSON schema:\n{\n  "likely_same": true,\n  "confidence": 0.0,\n  "reasoning": "string"\n}`
+  },
+  // STAGE 1: Process multiple chunks in one model call to amortize prompt
+  // overhead. Returns a single JSON object with per-chunk arrays so the
+  // pipeline can still attribute extractions back to source documents.
+  batchEntityExtraction: {
+    system: [
+      "You extract entities and claims from multiple archival text blocks in a single pass.",
+      "Output raw JSON only, no markdown, no prose, no code fences.",
+      "Preserve chunk_id from each input block exactly. Be conservative when uncertain."
+    ].join(" "),
+    userTemplate: ({ subject, contextCue, chunks }) => `Task: For each text block below, extract entities and factual claims relevant to the subject.\n\nSubject: ${subject}\nContext Cues: ${contextCue || "None"}\n\nBlocks:\n${chunks
+      .map(
+        (c) =>
+          `--- BEGIN BLOCK ---\nchunk_id: ${c.chunkId}\nsource_url: ${c.sourceUrl}\ntext:\n${c.chunkText}\n--- END BLOCK ---`
+      )
+      .join("\n\n")}\n\nReturn a SINGLE JSON object with schema:\n{\n  "results": [\n    {\n      "chunk_id": "string",\n      "entities": [\n        {\n          "name": "string",\n          "type": "person|organization|location|date|operation|file_number|other",\n          "aliases": ["string"],\n          "role": "string",\n          "confidence": 0.0\n        }\n      ],\n      "claims": [\n        {\n          "subject_entity": "string",\n          "object_entity": "string",\n          "relation": "string",\n          "date": "string",\n          "location": "string",\n          "action": "string",\n          "quote": "string",\n          "confidence": 0.0\n        }\n      ]\n    }\n  ]\n}`
+  },
+  // STAGE 2: Single-pass global synthesis. Replaces O(n^2) pairwise
+  // entityResolution calls with one aggregate decision over all candidates.
+  globalEntitySynthesis: {
+    system: [
+      "You are the lead investigator consolidating extracted entities into a clean canonical set.",
+      "Output raw JSON only. No prose, no markdown, no code fences.",
+      "Only merge candidates you are confident refer to the same real-world entity."
+    ].join(" "),
+    userTemplate: ({ subject, candidates }) => `Subject: ${subject}\n\nCandidate entities (each with id, name, type, aliases, document_ids):\n${JSON.stringify(candidates)}\n\nIdentify which candidates refer to the same real-world entity. For each cluster (including singletons you are confident are already canonical), pick one canonical_id from the input ids.\n\nReturn JSON schema:\n{\n  "clusters": [\n    {\n      "canonical_id": "string",\n      "member_ids": ["string"],\n      "canonical_name": "string",\n      "merge_reason": "string",\n      "confidence": 0.0\n    }\n  ]\n}`
   }
 };
 

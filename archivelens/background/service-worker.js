@@ -17,6 +17,7 @@ import {
   resumeDomain
 } from "./crawlpolicy.js";
 import { resolveEntities } from "./entityresolver.js";
+import { batchExtractChunks } from "./batchextract.js";
 import { verifyFindings } from "./factcheck.js";
 import {
   addSpanEvent,
@@ -269,31 +270,28 @@ async function ingestAndAnalyze(session, documents, subject, contextCue, setting
   for (const doc of documents) {
     addSpanEvent(span, "document.processing.start", { "document.url": doc.url });
     const chunks = chunkText(doc.text || "", settings.chunkTokenLimit || 2000, settings.chunkOverlapTokens || 200);
+    const chunkInputs = chunks.map((text, i) => ({
+      chunkId: `${doc.id}:${i}`,
+      sourceUrl: doc.url,
+      chunkText: text,
+      documentId: doc.id
+    }));
+
     let docEntities = [];
     let docClaims = [];
 
-    for (let i = 0; i < chunks.length; i += 1) {
-      const prompt = OLLAMA_PROMPTS.entityExtraction.userTemplate({
-        subject,
-        contextCue,
-        chunkText: chunks[i],
-        chunkId: `${doc.id}:${i}`,
-        sourceUrl: doc.url
-      });
+    const extractions = await batchExtractChunks({
+      chunks: chunkInputs,
+      subject,
+      contextCue,
+      batchSize: Math.max(1, Number(settings.chunkBatchSize || 5)),
+      concurrency: Math.max(1, Number(settings.ollamaConcurrency || 1)),
+      callOllama: ({ system, prompt, meta }) =>
+        callOllama(settings, system, prompt, span, { ...meta, documentId: doc.id })
+    });
 
-      const raw = await callOllama(settings, OLLAMA_PROMPTS.entityExtraction.system, prompt, span, {
-        operation: "entity_extraction",
-        chunkIndex: i,
-        documentId: doc.id
-      });
-      let parsed;
-      try {
-        parsed = cleanJsonResponse(raw);
-      } catch (_err) {
-        parsed = { entities: [], claims: [] };
-      }
-
-      for (const ent of parsed.entities || []) {
+    for (const result of extractions) {
+      for (const ent of result.entities || []) {
         docEntities.push(ent.name);
         entitiesRaw.push({
           ...ent,
@@ -302,7 +300,7 @@ async function ingestAndAnalyze(session, documents, subject, contextCue, setting
         });
       }
 
-      for (const claim of parsed.claims || []) {
+      for (const claim of result.claims || []) {
         const claimRow = {
           id: crypto.randomUUID(),
           sessionId: session.id,
@@ -335,7 +333,9 @@ async function ingestAndAnalyze(session, documents, subject, contextCue, setting
 
   updateJob(session.id, "Resolving cross-archive entities");
   const resolvedEntities = await resolveEntities(entitiesRaw, {
-    callOllama: ({ system, prompt }) => callOllama(settings, system, prompt, span, { operation: "entity_resolution" })
+    subject,
+    useGlobalSynthesis: settings.useGlobalSynthesis !== false,
+    callOllama: ({ system, prompt, meta }) => callOllama(settings, system, prompt, span, { operation: "entity_resolution", ...(meta || {}) })
   });
 
   const entityByName = new Map();

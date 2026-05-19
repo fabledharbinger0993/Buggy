@@ -55,6 +55,31 @@
         </fieldset>
 
         <fieldset>
+          <legend>Pipeline Optimization</legend>
+          <label>Chunk Batch Size (chunks per Ollama call)
+            <input id="chunkBatchSize" type="number" min="1" max="20" step="1" />
+          </label>
+          <label>Ollama Concurrency (parallel batches)
+            <input id="ollamaConcurrency" type="number" min="1" max="8" step="1" />
+          </label>
+          <label class="checkbox">
+            <input id="useGlobalSynthesis" type="checkbox" />
+            <span>Use global entity synthesis (single-call clustering)</span>
+          </label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Embeddings Service (optional)</legend>
+          <label>Service URL (leave blank to disable)
+            <input id="embeddingsServiceUrl" type="url" placeholder="http://localhost:5050" />
+          </label>
+          <label class="checkbox">
+            <input id="useSemanticClustering" type="checkbox" />
+            <span>Cluster chunks semantically before extraction</span>
+          </label>
+        </fieldset>
+
+        <fieldset>
           <legend>Tracing (OTLP)</legend>
           <label class="checkbox">
             <input id="tracingEnabled" type="checkbox" />

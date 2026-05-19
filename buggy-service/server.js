@@ -42,6 +42,7 @@ import {
   resumeDomain
 } from "./crawlpolicy.js";
 import { resolveEntities } from "./entityresolver.js";
+import { batchExtractChunks } from "./batchextract.js";
 import { verifyFindings } from "./factcheck.js";
 import {
   addSpanEvent,
@@ -161,6 +162,59 @@ app.post("/resume-domain", (req, res) => {
   res.json({ resumed: true });
 });
 
+// ─── Embeddings (Stage 3) ─────────────────────────────────────────────────────
+
+app.post("/embed", async (req, res) => {
+  try {
+    const settings = await getSettings();
+    if (settings.embeddingsEnabled === false) {
+      return res.status(503).json({ error: "embeddings disabled in settings" });
+    }
+    const texts = Array.isArray(req.body?.texts) ? req.body.texts : [];
+    if (!texts.length) return res.status(400).json({ error: "texts[] required" });
+    const { embedTexts } = await import("./embeddings.js");
+    const result = await embedTexts(texts, { model: req.body?.model || settings.embeddingsModel });
+    res.json(result);
+  } catch (err) {
+    console.error("[/embed] failed:", err);
+    res.status(500).json({ error: err?.message || "embedding failed" });
+  }
+});
+
+app.post("/vector-cluster", async (req, res) => {
+  try {
+    const settings = await getSettings();
+    if (settings.embeddingsEnabled === false) {
+      return res.status(503).json({ error: "embeddings disabled in settings" });
+    }
+    const chunks = Array.isArray(req.body?.chunks) ? req.body.chunks : [];
+    if (!chunks.length) return res.status(400).json({ error: "chunks[] required" });
+    const threshold = Number(req.body?.threshold ?? 0.78);
+
+    const { embedTexts, clusterByCosine } = await import("./embeddings.js");
+    const { vectors, model, dim } = await embedTexts(
+      chunks.map((c) => c.text || ""),
+      { model: req.body?.model || settings.embeddingsModel }
+    );
+
+    const items = chunks.map((c, i) => ({ id: c.id || String(i), vector: vectors[i] }));
+    const clusters = clusterByCosine(items, threshold);
+
+    res.json({
+      model,
+      dim,
+      threshold,
+      clusters: clusters.map((c, i) => ({
+        clusterId: `c${i}`,
+        memberIds: c.memberIds,
+      })),
+    });
+  } catch (err) {
+    console.error("[/vector-cluster] failed:", err);
+    res.status(500).json({ error: err?.message || "clustering failed" });
+  }
+});
+
 // ─── Pipeline ─────────────────────────────────────────────────────────────────
 
 async function startSearchSession(payload) {
@@ -273,27 +327,33 @@ async function ingestAndAnalyze(session, documents, subject, contextCue, setting
     for (const doc of documents) {
       addSpanEvent(span, "document.processing.start", { "document.url": doc.url });
       const chunks = chunkText(doc.text || "", settings.chunkTokenLimit || 2000, settings.chunkOverlapTokens || 200);
+      const chunkInputs = chunks.map((text, i) => ({
+        chunkId: `${doc.id}:${i}`,
+        sourceUrl: doc.url,
+        chunkText: text,
+        documentId: doc.id
+      }));
+
       let docEntities = [];
       let docClaims = [];
 
-      for (let i = 0; i < chunks.length; i++) {
-        const prompt = OLLAMA_PROMPTS.entityExtraction.userTemplate({
-          subject, contextCue, chunkText: chunks[i], chunkId: `${doc.id}:${i}`, sourceUrl: doc.url
-        });
+      const extractions = await batchExtractChunks({
+        chunks: chunkInputs,
+        subject,
+        contextCue,
+        batchSize: Math.max(1, Number(settings.chunkBatchSize || 5)),
+        concurrency: Math.max(1, Number(settings.ollamaConcurrency || 1)),
+        callOllama: ({ system, prompt, meta }) =>
+          callOllama(settings, system, prompt, span, { ...meta, documentId: doc.id })
+      });
 
-        const raw = await callOllama(settings, OLLAMA_PROMPTS.entityExtraction.system, prompt, span, {
-          operation: "entity_extraction", chunkIndex: i, documentId: doc.id
-        });
-
-        let parsed;
-        try { parsed = cleanJsonResponse(raw); } catch { parsed = { entities: [], claims: [] }; }
-
-        for (const ent of parsed.entities || []) {
+      for (const result of extractions) {
+        for (const ent of result.entities || []) {
           docEntities.push(ent.name);
           entitiesRaw.push({ ...ent, sessionId: session.id, documentIds: [doc.id] });
         }
 
-        for (const claim of parsed.claims || []) {
+        for (const claim of result.claims || []) {
           const claimRow = {
             id: randomUUID(), sessionId: session.id, documentId: doc.id,
             subjectEntity: claim.subject_entity, objectEntity: claim.object_entity,
@@ -317,7 +377,9 @@ async function ingestAndAnalyze(session, documents, subject, contextCue, setting
 
     updateJob(session.id, "Resolving cross-archive entities");
     const resolvedEntities = await resolveEntities(entitiesRaw, {
-      callOllama: ({ system, prompt }) => callOllama(settings, system, prompt, span, { operation: "entity_resolution" })
+      subject,
+      useGlobalSynthesis: settings.useGlobalSynthesis !== false,
+      callOllama: ({ system, prompt, meta }) => callOllama(settings, system, prompt, span, { operation: "entity_resolution", ...(meta || {}) })
     });
 
     const entityByName = new Map();

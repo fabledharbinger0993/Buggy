@@ -241,7 +241,16 @@ export function getDefaultSettings() {
     chunkOverlapTokens: 200,
     tracingEnabled: true,
     tracingEndpoint: "http://localhost:4318/v1/traces",
-    tracingServiceName: "buggy-service"
+    tracingServiceName: "buggy-service",
+    // Stage 1: batch entity extraction
+    chunkBatchSize: 5,
+    ollamaConcurrency: 1,
+    // Stage 2: global synthesis (single-call entity clustering)
+    useGlobalSynthesis: true,
+    // Stage 3: embeddings (in-process via @xenova/transformers)
+    embeddingsEnabled: true,
+    useSemanticClustering: false,
+    embeddingsModel: "Xenova/all-MiniLM-L6-v2"
   };
 }
 

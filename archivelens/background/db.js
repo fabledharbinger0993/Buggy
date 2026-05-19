@@ -17,7 +17,15 @@ export function getDefaultSettings() {
     chunkOverlapTokens: 200,
     tracingEnabled: true,
     tracingEndpoint: "http://localhost:4318/v1/traces",
-    tracingServiceName: "archivelens-extension"
+    tracingServiceName: "archivelens-extension",
+    // Stage 1: batch entity extraction
+    chunkBatchSize: 5,
+    ollamaConcurrency: 1,
+    // Stage 2: global synthesis (single-call entity clustering)
+    useGlobalSynthesis: true,
+    // Stage 3: optional embeddings service for semantic chunk clustering
+    embeddingsServiceUrl: "",
+    useSemanticClustering: false
   };
 }
 

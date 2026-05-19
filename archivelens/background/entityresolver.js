@@ -1,4 +1,5 @@
 import { OLLAMA_PROMPTS, cleanJsonResponse } from "./prompts.js";
+import { globalSynthesizeEntities } from "./synthesis.js";
 
 function stripHonorifics(value) {
   return value.replace(/\b(mr|mrs|ms|dr|sir|gen|lt|col|capt|maj|prof)\.?,?\s+/gi, "");
@@ -45,6 +46,20 @@ export async function resolveEntities(entityList, options) {
   }
 
   const canonical = Array.from(byCanonical.values());
+
+  // STAGE 2: try a single global synthesis call. If it fails, falls back to
+  // the original pairwise probabilistic merge.
+  if (options.useGlobalSynthesis !== false) {
+    const synthesized = await globalSynthesizeEntities({
+      subject: options.subject || "",
+      canonical,
+      callOllama: ({ system, prompt, meta }) => options.callOllama({ system, prompt, meta })
+    });
+    if (synthesized) {
+      return synthesized;
+    }
+  }
+
   await probabilisticMerge(canonical, options);
 
   return canonical.map((row) => ({
