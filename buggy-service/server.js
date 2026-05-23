@@ -59,6 +59,15 @@ const PORT = parseInt(process.env.BUGGY_PORT || "5050", 10);
 const app = express();
 app.use(express.json());
 
+// CORS — allow browser-based clients (CARTOGRAPHER artifact, local extension)
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") return res.sendStatus(200);
+  next();
+});
+
 // Active jobs: jobId → { status, progress, sessionId, traceId, updatedAt }
 const activeJobs = new Map();
 
@@ -626,136 +635,77 @@ async function listSessions(query) {
     .sort((a, b) => b.lastModified - a.lastModified);
 }
 
+// ─── Claude API — drop-in replacement for callOllama + _ollamaChat ────────────
+//
+// Replaces all Ollama calls with Anthropic Claude API.
+// Same call signatures as the functions they replace so no pipeline changes needed.
+//
+// Required env var: ANTHROPIC_API_KEY
+// Optional:        BUGGY_MODEL (default: claude-haiku-4-5-20251001 — fast + cheap for bulk extraction)
+//                  BUGGY_SYNTH_MODEL (default: claude-sonnet-4-6 — for context brief + tribunal)
+
+const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
+const EXTRACT_MODEL = process.env.BUGGY_MODEL       || "claude-haiku-4-5-20251001";
+const SYNTH_MODEL   = process.env.BUGGY_SYNTH_MODEL || "claude-sonnet-4-6";
+
+async function callClaude(system, prompt, { model = EXTRACT_MODEL, maxTokens = 2048 } = {}) {
+  const resp = await fetch(ANTHROPIC_API, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": process.env.ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: maxTokens,
+      system,
+      messages: [{ role: "user", content: prompt }],
+    }),
+    signal: AbortSignal.timeout(60_000),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(`Claude API error ${resp.status}: ${err?.error?.message || "unknown"}`);
+  }
+
+  const data = await resp.json();
+  return (data.content || []).filter(b => b.type === "text").map(b => b.text).join("") || "{}";
+}
+
+// Drop-in for callOllama — used in pipeline for extraction, entity resolution, fact-check
 async function callOllama(settings, system, prompt, parentSpan, meta = {}) {
-  const span = startSpan("ollama.generate", {
-    "ollama.model": settings.ollamaModel || "llama3",
-    "ollama.operation": meta.operation || "unknown"
+  const span = startSpan("claude.generate", {
+    "claude.model": EXTRACT_MODEL,
+    "claude.operation": meta.operation || "unknown"
   }, parentSpan || null);
 
-  const endpoint = settings.ollamaEndpoint || "http://localhost:11434/api/generate";
-  const payload = {
-    model: settings.ollamaModel || "llama3",
-    prompt: `${system}\n\n${prompt}`,
-    stream: false,
-    options: { temperature: 0.1 }
-  };
-
-  let res;
   try {
-    addSpanEvent(span, "ollama.request", { endpoint, promptLength: String(prompt || "").length });
-    res = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    addSpanEvent(span, "claude.request", { promptLength: String(prompt || "").length });
+    // Use Haiku for bulk extraction tasks, Sonnet for synthesis
+    const isSynth = ["context_brief", "document_summary"].includes(meta.operation);
+    const result = await callClaude(system, prompt, {
+      model: isSynth ? SYNTH_MODEL : EXTRACT_MODEL,
+      maxTokens: isSynth ? 4096 : 2048,
+    });
+    setSpanAttribute(span, "claude.response_length", String(result).length);
+    endSpan(span, { ok: true });
+    return result;
   } catch (error) {
     endSpan(span, { error });
     throw error;
   }
-
-  addSpanEvent(span, "ollama.response", { status: res.status });
-  if (!res.ok) {
-    endSpan(span, { ok: false, message: `Ollama HTTP ${res.status}` });
-    throw new Error(`Ollama error: ${res.status}`);
-  }
-
-  const data = await res.json();
-  setSpanAttribute(span, "ollama.response_length", String(data.response || "").length);
-  endSpan(span, { ok: true });
-  return data.response || "{}";
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function updateJob(jobId, progress, status = "active") {
-  const state = activeJobs.get(jobId) || { sessionId: jobId };
-  activeJobs.set(jobId, { ...state, status, progress, updatedAt: Date.now() });
-}
-
-function deriveTitle(text, url) {
-  const match = String(text || "").match(/<title>([^<]+)<\/title>/i);
-  return match ? match[1].trim() : url;
-}
-
-function extractLinks(html, baseUrl) {
-  const links = new Set();
-  const hrefRe = /href=["']([^"'#]+)["']/gi;
-  let match;
-  while ((match = hrefRe.exec(html || ""))) {
-    try {
-      const candidate = new URL(match[1], baseUrl).toString();
-      if (candidate.startsWith("http://") || candidate.startsWith("https://")) links.add(candidate);
-    } catch { continue; }
-  }
-  return [...links].slice(0, 120);
-}
-
-function chunkText(text, limitTokens = 2000, overlapTokens = 200) {
-  const words = String(text || "").replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean);
-  if (words.length <= limitTokens) return [words.join(" ")];
-  const chunks = [];
-  let start = 0;
-  while (start < words.length) {
-    const end = Math.min(start + limitTokens, words.length);
-    chunks.push(words.slice(start, end).join(" "));
-    if (end >= words.length) break;
-    start = Math.max(0, end - overlapTokens);
-  }
-  return chunks;
-}
-
-function computeDocRelevance(claims) {
-  if (!claims.length) return 0;
-  return claims.reduce((sum, c) => sum + Number(c.confidence || 0), 0) / claims.length;
-}
-
-function stripHtml(text) {
-  return String(text || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-}
-
-async function cloneToText(response) {
-  try { return await response.clone().text(); } catch { return ""; }
-}
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-// Autosave active sessions every five minutes (mirrors service-worker interval)
-setInterval(async () => {
-  const sessions = await getAll("sessions");
-  const active = sessions.filter((s) => s.status === "active");
-  for (const session of active) {
-    await put("sessions", { ...session, lastModified: Date.now() });
-  }
-}, 5 * 60 * 1000);
-
-// ─── Congress Review (Skeptic / Advocate / Synthesizer) ──────────────────────
-//
-// Silent three-persona review of a completed research session. Same pattern as
-// RekitBox's run_tribunal — fire-and-forget from the caller, results stored in
-// the sessions table as congress_review metadata. Never throws to the client.
-//
-// POST /congress/review  { sessionId, subject, claimCount, entityCount, inconsistencyCount }
-
+// Drop-in for _ollamaChat — used in congress/tribunal (skeptic/advocate/synthesizer)
 async function _ollamaChat(system, userContent, settings) {
-  const endpoint = (settings.ollamaEndpoint || "http://localhost:11434/api/generate")
-    .replace("/api/generate", "/api/chat");
-  const model = settings.ollamaModel || "qwen2.5-coder:7b";
-  const resp = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model,
-      stream: false,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: userContent },
-      ],
-      options: { temperature: 0.1 },
-    }),
-    signal: AbortSignal.timeout(45_000),
+  const raw = await callClaude(system, userContent, {
+    model: SYNTH_MODEL,
+    maxTokens: 1024,
   });
-  const data = await resp.json();
-  return cleanJsonResponse((data?.message?.content || "").trim());
+  return cleanJsonResponse(raw);
 }
-
 async function runSessionTribunal(sessionId, subject, stats, settings) {
   const content = `Research subject: ${subject}\nClaims found: ${stats.claimCount}\nEntities found: ${stats.entityCount}\nInconsistencies: ${stats.inconsistencyCount}`;
 
@@ -804,3 +754,10 @@ app.listen(PORT, () => {
   console.log(`[buggy-service] listening on http://localhost:${PORT}`);
   console.log(`[buggy-service] data dir: ${process.env.BUGGY_DATA_DIR || "~/.buggy-service"}`);
 });
+
+// ─── Startup validation ───────────────────────────────────────────────────────
+if (!process.env.ANTHROPIC_API_KEY) {
+  console.error("[buggy-service] FATAL: ANTHROPIC_API_KEY env var is required.");
+  console.error("[buggy-service] Set it in your .env file or deployment environment.");
+  process.exit(1);
+}
