@@ -101,7 +101,13 @@ export default function ConnectionsGraph({ mapData, resData, synthData }) {
     el.innerHTML = ''
 
     if (!nodes.length) {
-      el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:${C.dim};font-family:'Space Mono',monospace;font-size:12px;">No entities mapped yet</div>`
+      const msg = document.createElement('div')
+      Object.assign(msg.style, {
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        height: '100%', color: C.dim, fontFamily: "'Space Mono',monospace", fontSize: '12px',
+      })
+      msg.textContent = 'No entities mapped yet'
+      el.appendChild(msg)
       return
     }
 
