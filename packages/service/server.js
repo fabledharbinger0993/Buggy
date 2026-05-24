@@ -60,7 +60,7 @@ import {
   traceAsync
 } from "./tracing.js";
 
-const PORT = parseInt(process.env.BUGGY_PORT || "5050", 10);
+const PORT = parseInt(process.env.PORT || process.env.BUGGY_PORT || "5050", 10);
 const app = express();
 app.use(express.json());
 
