@@ -1,0 +1,14 @@
+{
+  "name": "fungai-pi",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w packages/web\" \"npm run dev -w packages/service\"",
+    "build": "npm run build -w packages/web",
+    "start:service": "npm run start -w packages/service"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
