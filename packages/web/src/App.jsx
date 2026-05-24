@@ -583,7 +583,7 @@ async function callBuggy(subject, sources) {
     if (!resp.ok) return ''
     const data = await resp.json()
     if (!data?.ok) return ''
-    return `[Archive crawl started — job: ${data.result?.jobId || 'queued'}]`
+    return ''
   } catch {
     return ''
   }
@@ -726,7 +726,7 @@ export default function App() {
       )
       if (abortRef.current) return
       const map = safeJSON(raw1)
-      if (!map) throw new Error('SPORE CAST returned unparseable JSON. Check your API key.')
+      if (!map) throw new Error('SPORE CAST returned unparseable JSON. Check that the Buggy service is running and the API key is configured.')
       setMapData(map)
 
       // ── Phase 2: MYCELIUM SPREAD ─────────────────────────────────────────
@@ -749,7 +749,7 @@ export default function App() {
         'Flag all inconsistencies and evidence gaps.',
       ].filter(Boolean).join('\n')
 
-      const raw2 = await callClaude(SYNTH_MODEL, SYS_RESEARCH, resPrompt)
+      const raw2 = await callClaude(EXTRACT_MODEL, SYS_RESEARCH, resPrompt)
       if (abortRef.current) return
       const res = safeJSON(raw2)
       if (!res) throw new Error('MYCELIUM SPREAD returned unparseable JSON.')
