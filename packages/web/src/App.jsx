@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react'
 import MyceliumCanvas from './MyceliumCanvas.jsx'
+import ConnectionsGraph from './ConnectionsGraph.jsx'
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 
@@ -585,6 +586,28 @@ function tagVariant(type) {
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
 async function callClaude(apiKey, model, system, prompt) {
+  // Try server-side proxy first (API key stays on the server)
+  try {
+    const resp = await fetch('/claude', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ system, prompt, model }),
+    })
+    if (resp.ok) {
+      const data = await resp.json()
+      return data.text || ''
+    }
+  } catch {
+    // service unavailable — fall through to direct browser call
+  }
+
+  // Fallback: direct Anthropic API call (needs apiKey in settings)
+  if (!apiKey?.trim()) {
+    throw new Error(
+      'Service proxy unavailable and no API key configured. ' +
+      'Start the Buggy service, or paste your Anthropic key in Settings.'
+    )
+  }
   const resp = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -605,16 +628,12 @@ async function callClaude(apiKey, model, system, prompt) {
     throw new Error(`Claude API ${resp.status}: ${err?.error?.message || resp.statusText}`)
   }
   const data = await resp.json()
-  return (data.content || [])
-    .filter(b => b.type === 'text')
-    .map(b => b.text)
-    .join('')
+  return (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('')
 }
 
-async function callBuggy(baseUrl, subject, sources) {
-  if (!baseUrl?.trim()) return ''
+async function callBuggy(subject, sources) {
   try {
-    const resp = await fetch(`${baseUrl.replace(/\/$/, '')}/search`, {
+    const resp = await fetch('/search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ subject, sources: sources || [], depth: 1 }),
@@ -622,7 +641,7 @@ async function callBuggy(baseUrl, subject, sources) {
     if (!resp.ok) return ''
     const data = await resp.json()
     if (!data?.ok) return ''
-    return `[Buggy archive crawl initiated — job: ${data.result?.jobId || 'queued'}. Results will enrich the research phase.]`
+    return `[Archive crawl started — job: ${data.result?.jobId || 'queued'}]`
   } catch {
     return ''
   }
@@ -736,7 +755,6 @@ export default function App() {
   const [error,        setError]        = useState('')
   const [statusMsg,    setStatusMsg]    = useState('')
   const [apiKey,       setApiKey]       = useState(() => localStorage.getItem('fungai_api_key') || '')
-  const [buggyUrl,     setBuggyUrl]     = useState(() => localStorage.getItem('fungai_buggy_url') || '')
   const [showSettings, setShowSettings] = useState(!localStorage.getItem('fungai_api_key'))
   const [activeTab,    setActiveTab]    = useState('map')
   const abortRef = useRef(false)
@@ -747,17 +765,11 @@ export default function App() {
     (synthData?.cast?.length    || 0)
 
   function savePrefs() {
-    localStorage.setItem('fungai_api_key',  apiKey)
-    localStorage.setItem('fungai_buggy_url', buggyUrl)
+    localStorage.setItem('fungai_api_key', apiKey)
   }
 
   const resetAndRun = useCallback(async () => {
     if (!topic.trim()) return
-    if (!apiKey.trim()) {
-      setError('Anthropic API key required. Open Settings above and paste your key.')
-      setShowSettings(true)
-      return
-    }
     abortRef.current = false
     setError('')
     setMapData(null)
@@ -787,11 +799,9 @@ export default function App() {
       setStatusMsg('Spreading mycelium — deep research underway…')
 
       let archiveCtx = ''
-      if (buggyUrl.trim()) {
-        setStatusMsg('Spreading mycelium — querying Buggy archive service…')
-        archiveCtx = await callBuggy(buggyUrl, topic, map.archiveSources || [])
-        setStatusMsg('Spreading mycelium — analysing archive context…')
-      }
+      setStatusMsg('Spreading mycelium — querying archive sources…')
+      archiveCtx = await callBuggy(topic, map.archiveSources || [])
+      if (archiveCtx) setStatusMsg('Spreading mycelium — analysing archive context…')
 
       const resPrompt = [
         `Investigation topic: ${topic}`,
@@ -843,7 +853,7 @@ export default function App() {
         setStatusMsg('')
       }
     }
-  }, [topic, apiKey, buggyUrl])
+  }, [topic, apiKey])
 
   function handleReset() {
     abortRef.current = true
@@ -871,6 +881,7 @@ export default function App() {
     { id: 'map',   label: 'Spore Map',     data: mapData  },
     { id: 'res',   label: 'Mycelium',      data: resData  },
     { id: 'synth', label: 'Fruiting Body', data: synthData },
+    { id: 'graph', label: 'Connections',   data: mapData || resData || synthData },
   ]
 
   return (
@@ -914,32 +925,21 @@ export default function App() {
         {showSettings && (
           <div style={S.settingsPanel}>
             <span style={S.label}>⚙ Configuration</span>
-            <div style={S.settingsGrid}>
-              <div>
-                <label style={S.label}>Anthropic API Key</label>
-                <input
-                  style={S.inputSmall}
-                  type="password"
-                  placeholder="sk-ant-…"
-                  value={apiKey}
-                  onChange={e => setApiKey(e.target.value)}
-                  onBlur={savePrefs}
-                />
-              </div>
-              <div>
-                <label style={S.label}>Buggy Service URL (optional)</label>
-                <input
-                  style={S.inputSmall}
-                  placeholder="http://localhost:5050"
-                  value={buggyUrl}
-                  onChange={e => setBuggyUrl(e.target.value)}
-                  onBlur={savePrefs}
-                />
-              </div>
+            <div style={{ marginTop: '12px' }}>
+              <label style={S.label}>Fallback API Key (used when service is unavailable)</label>
+              <input
+                style={S.inputSmall}
+                type="password"
+                placeholder="sk-ant-… (optional when Buggy service is running)"
+                value={apiKey}
+                onChange={e => setApiKey(e.target.value)}
+                onBlur={savePrefs}
+              />
             </div>
-            <div style={{ marginTop: '12px', fontSize: '11px', color: C.dim, lineHeight: 1.6 }}>
-              API key stored in localStorage. Buggy service is optional — when set, it injects
-              live archive crawl context into the MYCELIUM SPREAD phase.
+            <div style={{ marginTop: '12px', fontSize: '11px', color: C.dim, lineHeight: 1.8 }}>
+              When the Buggy service is running, it handles all Claude API calls server-side
+              (no key needed here). The key above is a fallback for browser-only mode.
+              In production the service is at the same origin — no extra config needed.
             </div>
           </div>
         )}
@@ -1165,6 +1165,26 @@ export default function App() {
                         </ul>
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* ── CONNECTIONS tab ──────────────────────────────────── */}
+                {activeTab === 'graph' && (
+                  <div style={S.resultSection}>
+                    <div style={S.resultHeader}>
+                      Entity Network
+                      <span style={S.badge}>
+                        {(mapData?.entities?.length || 0) + (resData?.entities?.length || 0)} nodes
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '11px', color: C.dim, marginBottom: '12px', fontFamily: '"Space Mono", monospace' }}>
+                      Drag nodes · scroll to zoom · solid lines = mapped relationships · dashed = co-occurrence
+                    </div>
+                    <ConnectionsGraph
+                      mapData={mapData}
+                      resData={resData}
+                      synthData={synthData}
+                    />
                   </div>
                 )}
 

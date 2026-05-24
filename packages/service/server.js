@@ -23,6 +23,11 @@
 
 import express from "express";
 import { randomUUID } from "crypto";
+import { fileURLToPath } from "url";
+import path from "path";
+import { existsSync } from "fs";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import {
   bulkPut,
   ensureDefaultSettings,
@@ -747,6 +752,35 @@ app.post("/congress/review", async (req, res) => {
     runSessionTribunal(sessionId, subject, { claimCount, entityCount, inconsistencyCount }, s).catch(() => {});
   } catch { /* silent */ }
 });
+
+// ─── Claude proxy (keeps API key server-side) ─────────────────────────────────
+
+app.post("/claude", async (req, res) => {
+  try {
+    const { system, prompt, model } = req.body || {};
+    if (!prompt) return res.status(400).json({ ok: false, error: "prompt required" });
+    const text = await callClaude(system || "", prompt, {
+      model: model || EXTRACT_MODEL,
+      maxTokens: 4096,
+    });
+    res.json({ ok: true, text });
+  } catch (err) {
+    console.error("[/claude]", err.message);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ─── Static web app (Railway production) ──────────────────────────────────────
+
+const WEB_DIST = path.resolve(__dirname, "../web/dist");
+if (existsSync(WEB_DIST)) {
+  app.use(express.static(WEB_DIST));
+  // SPA fallback — only for non-API GET requests
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(WEB_DIST, "index.html"));
+  });
+  console.log(`[buggy-service] serving web app from ${WEB_DIST}`);
+}
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 
