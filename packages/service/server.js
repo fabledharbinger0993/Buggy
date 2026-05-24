@@ -7,7 +7,7 @@
  *   - chrome.runtime.onMessage  → Express routes
  *   - IndexedDB (db.js)         → SQLite (db.js in this directory)
  *   - chrome.notifications      → console.log
- *   - chrome.tabs (active page) → explicit url param in POST /crawl
+ *   - chrome.tabs (active page) → explicit url param in PhOST /crawl
  *   - chrome.downloads          → JSON response body
  *
  * Routes:
@@ -565,7 +565,8 @@ async function summarizeDocument(settings, doc, subject, parentSpan) {
     operation: "document_summary", documentId: doc.id
   });
   try {
-600_000    return parsed.summary || "Summary unavailable";
+const parsed = cleanJsonResponse(raw);
+        return parsed.summary || "Summary unavailable";
   } catch {
     return "Summary unavailable";
   }
@@ -574,7 +575,7 @@ async function summarizeDocument(settings, doc, subject, parentSpan) {
 async function persistSessionData(session, documents, entities, claims, brief) {
   await bulkPut("documents", documents);
   await bulkPut("entities", entities);
-  await bulkPut("claims", claims);h
+  await bulkPut("claims", claims);
   await put("sessions", {
     ...session, lastModified: Date.now(), brief,
     documentIds: documents.map((d) => d.id),
