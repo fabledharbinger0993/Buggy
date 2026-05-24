@@ -565,8 +565,7 @@ async function summarizeDocument(settings, doc, subject, parentSpan) {
     operation: "document_summary", documentId: doc.id
   });
   try {
-    const parsed = cleanJsonResponse(raw);
-    return parsed.summary || "Summary unavailable";
+600_000    return parsed.summary || "Summary unavailable";
   } catch {
     return "Summary unavailable";
   }
@@ -575,7 +574,7 @@ async function summarizeDocument(settings, doc, subject, parentSpan) {
 async function persistSessionData(session, documents, entities, claims, brief) {
   await bulkPut("documents", documents);
   await bulkPut("entities", entities);
-  await bulkPut("claims", claims);
+  await bulkPut("claims", claims);h
   await put("sessions", {
     ...session, lastModified: Date.now(), brief,
     documentIds: documents.map((d) => d.id),
@@ -667,7 +666,7 @@ async function callClaude(system, prompt, { model = EXTRACT_MODEL, maxTokens = 2
       system,
       messages: [{ role: "user", content: prompt }],
     }),
-    signal: AbortSignal.timeout(60_000),
+    signal: AbortSignal.timeout(600_000),
   });
 
   if (!resp.ok) {
