@@ -249,20 +249,6 @@ const S = {
     transition: 'border-color 0.2s',
   },
 
-  inputSmall: {
-    width: '100%',
-    background: C.bgCard,
-    border: `1px solid ${C.border}`,
-    borderRadius: '6px',
-    color: C.cream,
-    fontFamily: '"Space Mono", monospace',
-    fontSize: '13px',
-    padding: '10px 14px',
-    outline: 'none',
-    boxSizing: 'border-box',
-    transition: 'border-color 0.2s',
-  },
-
   row: {
     display: 'flex',
     gap: '12px',
@@ -461,31 +447,6 @@ const S = {
     borderBottomColor: C.amber,
   },
 
-  settingsToggle: {
-    background: 'transparent',
-    color: C.dim,
-    border: 'none',
-    fontSize: '11px',
-    cursor: 'pointer',
-    fontFamily: '"Space Mono", monospace',
-    padding: '0',
-  },
-
-  settingsPanel: {
-    background: C.bgPanel,
-    border: `1px solid ${C.border}`,
-    borderRadius: '8px',
-    padding: '18px',
-    marginBottom: '22px',
-  },
-
-  settingsGrid: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '14px',
-    marginTop: '14px',
-  },
-
   resultSection: {
     marginBottom: '28px',
   },
@@ -597,50 +558,19 @@ function tagVariant(type) {
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
-async function callClaude(apiKey, model, system, prompt) {
-  // Try server-side proxy first (API key stays on the server)
-  try {
-    const resp = await fetch('/claude', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ system, prompt, model }),
-    })
-    if (resp.ok) {
-      const data = await resp.json()
-      return data.text || ''
-    }
-  } catch {
-    // service unavailable — fall through to direct browser call
-  }
-
-  // Fallback: direct Anthropic API call (needs apiKey in settings)
-  if (!apiKey?.trim()) {
-    throw new Error(
-      'Service proxy unavailable and no API key configured. ' +
-      'Start the Buggy service, or paste your Anthropic key in Settings.'
-    )
-  }
-  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+async function callClaude(model, system, prompt) {
+  const resp = await fetch('/claude', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 4096,
-      system,
-      messages: [{ role: 'user', content: prompt }],
-    }),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ system, prompt, model }),
   })
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}))
-    throw new Error(`Claude API ${resp.status}: ${err?.error?.message || resp.statusText}`)
+    throw new Error(`Claude proxy ${resp.status}: ${err?.error || resp.statusText}`)
   }
   const data = await resp.json()
-  return (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('')
+  if (!data.ok) throw new Error(data.error || 'Claude proxy error')
+  return data.text || ''
 }
 
 async function callBuggy(subject, sources) {
@@ -766,8 +696,6 @@ export default function App() {
   const [synthData,    setSynthData]    = useState(null)
   const [error,        setError]        = useState('')
   const [statusMsg,    setStatusMsg]    = useState('')
-  const [apiKey,       setApiKey]       = useState(() => localStorage.getItem('fungai_api_key') || '')
-  const [showSettings, setShowSettings] = useState(!localStorage.getItem('fungai_api_key'))
   const [activeTab,    setActiveTab]    = useState('map')
   const [logoError,    setLogoError]    = useState(false)
   const abortRef = useRef(false)
@@ -777,10 +705,6 @@ export default function App() {
     (resData?.entities?.length  || 0) +
     (synthData?.cast?.length    || 0)
 
-  function savePrefs() {
-    localStorage.setItem('fungai_api_key', apiKey)
-  }
-
   const resetAndRun = useCallback(async () => {
     if (!topic.trim()) return
     abortRef.current = false
@@ -789,7 +713,6 @@ export default function App() {
     setResData(null)
     setSynthData(null)
     setActiveTab('map')
-    savePrefs()
 
     // ── Phase 1: SPORE CAST ──────────────────────────────────────────────────
     try {
@@ -797,7 +720,6 @@ export default function App() {
       setStatusMsg('Casting spores — mapping the investigation space…')
 
       const raw1 = await callClaude(
-        apiKey,
         EXTRACT_MODEL,
         SYS_MAP,
         `Investigation topic: ${topic}`,
@@ -827,7 +749,7 @@ export default function App() {
         'Flag all inconsistencies and evidence gaps.',
       ].filter(Boolean).join('\n')
 
-      const raw2 = await callClaude(apiKey, SYNTH_MODEL, SYS_RESEARCH, resPrompt)
+      const raw2 = await callClaude(SYNTH_MODEL, SYS_RESEARCH, resPrompt)
       if (abortRef.current) return
       const res = safeJSON(raw2)
       if (!res) throw new Error('MYCELIUM SPREAD returned unparseable JSON.')
@@ -850,7 +772,7 @@ export default function App() {
         'subplots, inconsistencies, and follow-up directives.',
       ].join('\n')
 
-      const raw3 = await callClaude(apiKey, SYNTH_MODEL, SYS_SYNTH, synthPrompt)
+      const raw3 = await callClaude(SYNTH_MODEL, SYS_SYNTH, synthPrompt)
       if (abortRef.current) return
       const synth = safeJSON(raw3)
       if (!synth) throw new Error('FRUITING BODY returned unparseable JSON.')
@@ -866,7 +788,7 @@ export default function App() {
         setStatusMsg('')
       }
     }
-  }, [topic, apiKey])
+  }, [topic])
 
   function handleReset() {
     abortRef.current = true
@@ -935,36 +857,6 @@ export default function App() {
 
       {/* ── Main ─────────────────────────────────────────────────────────── */}
       <main style={S.main}>
-
-        {/* Settings toggle */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '14px' }}>
-          <button style={S.settingsToggle} onClick={() => setShowSettings(s => !s)}>
-            {showSettings ? '▲ hide settings' : '▼ settings'}
-          </button>
-        </div>
-
-        {/* Settings panel */}
-        {showSettings && (
-          <div style={S.settingsPanel}>
-            <span style={S.label}>⚙ Configuration</span>
-            <div style={{ marginTop: '12px' }}>
-              <label style={S.label}>Fallback API Key (used when service is unavailable)</label>
-              <input
-                style={S.inputSmall}
-                type="password"
-                placeholder="sk-ant-… (optional when Buggy service is running)"
-                value={apiKey}
-                onChange={e => setApiKey(e.target.value)}
-                onBlur={savePrefs}
-              />
-            </div>
-            <div style={{ marginTop: '12px', fontSize: '11px', color: C.dim, lineHeight: 1.8 }}>
-              When the Buggy service is running, it handles all Claude API calls server-side
-              (no key needed here). The key above is a fallback for browser-only mode.
-              In production the service is at the same origin — no extra config needed.
-            </div>
-          </div>
-        )}
 
         {/* Error */}
         {error && (
