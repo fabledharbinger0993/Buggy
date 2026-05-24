@@ -125,7 +125,7 @@ const SYNTH_MODEL   = 'claude-sonnet-4-6'
 const S = {
   root: {
     minHeight: '100vh',
-    background: `radial-gradient(ellipse at 18% 0%, #1a0a2e 0%, ${C.bgDeep} 55%)`,
+    background: `radial-gradient(ellipse at 20% 0%, #120827 0%, #0a0810 40%, ${C.bgDeep} 65%)`,
     color: C.cream,
     fontFamily: '"Space Mono", monospace',
     fontSize: '14px',
@@ -156,18 +156,29 @@ const S = {
     gap: '22px',
   },
 
-  logoPlaceholder: {
-    width: '72px',
-    height: '72px',
+  logo: {
+    width: '80px',
+    height: '80px',
     borderRadius: '50%',
     border: `2px solid ${C.amber}`,
-    background: `radial-gradient(circle at 40% 35%, ${C.purple}55, ${C.bgPanel})`,
+    objectFit: 'cover',
+    flexShrink: 0,
+    mixBlendMode: 'screen',
+    boxShadow: `0 0 28px #823cff66, 0 0 12px ${C.amber}44`,
+  },
+
+  logoPlaceholder: {
+    width: '80px',
+    height: '80px',
+    borderRadius: '50%',
+    border: `2px solid ${C.amber}`,
+    background: `radial-gradient(circle at 40% 35%, #823cff55, ${C.bgPanel})`,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '30px',
+    fontSize: '32px',
     flexShrink: 0,
-    boxShadow: `0 0 24px ${C.purple}44`,
+    boxShadow: `0 0 28px #823cff66, 0 0 12px ${C.amber}44`,
   },
 
   wordmarkBlock: {
@@ -192,6 +203,7 @@ const S = {
     letterSpacing: '0.15em',
     textTransform: 'uppercase',
     lineHeight: 1,
+    textShadow: '0 0 18px rgba(130,60,255,0.5), 0 0 36px rgba(130,60,255,0.2)',
   },
 
   subhead: {
@@ -757,6 +769,7 @@ export default function App() {
   const [apiKey,       setApiKey]       = useState(() => localStorage.getItem('fungai_api_key') || '')
   const [showSettings, setShowSettings] = useState(!localStorage.getItem('fungai_api_key'))
   const [activeTab,    setActiveTab]    = useState('map')
+  const [logoError,    setLogoError]    = useState(false)
   const abortRef = useRef(false)
 
   const entityCount =
@@ -902,7 +915,16 @@ export default function App() {
           <MyceliumCanvas activeEntityCount={entityCount} />
         </div>
         <div style={S.headerContent}>
-          <div style={S.logoPlaceholder}>🍄</div>
+          {logoError ? (
+            <div style={S.logoPlaceholder}>🍄</div>
+          ) : (
+            <img
+              src="/logo.jpeg"
+              alt="FungAI P.I."
+              style={S.logo}
+              onError={() => setLogoError(true)}
+            />
+          )}
           <div style={S.wordmarkBlock}>
             <div style={S.eyebrow}>Adaptive Investigative Intelligence</div>
             <div style={S.wordmark}>FUNGA.I. P.I.</div>

@@ -91,11 +91,21 @@ The three investigation phases map directly to the mycelium metaphor:
 
 - **System name:** `FUNGA.I.` (replaces CARTOGRAPHER in all system prompts and UI copy)
 - **Full product name:** `FUNGA.I. P.I.`
-- **Wordmark:** `FUNGA.I. P.I.` — Orbitron, all-caps, 32px, `#e8e4d8`, letter-spacing 0.15em
+- **Wordmark:** `FUNGA.I. P.I.` — Orbitron, all-caps, 32px, `#e8e4d8`, letter-spacing 0.15em, purple glow shadow
 - **Eyebrow:** `Adaptive Investigative Intelligence` — Space Mono, 9px, `#6b3fa0`, letter-spacing 0.3em
 - **Subhead:** `Mycelium maps the hidden network. So do we.` — Space Mono italic, 12px, `#585450`
 - **Investigate button:** `◉ Inoculate`
 - **Reset button:** `↺ Clear Substrate`
+- **Logo:** `packages/web/public/logo.jpeg` — 80px circle, amber border, purple+amber glow.
+  Drop the logo JPEG at this path; the header will load it automatically and fall back to 🍄.
+
+## MyceliumCanvas node colors (logo-accurate)
+
+- Purple nodes: `#823cff` (electric violet) at 85% opacity with 6px glow
+- Amber nodes:  `#ff8c00` (deep orange) at 75% opacity with 6px glow
+- Purple↔purple lines: `rgba(130,60,255,0.28)`
+- Amber↔amber lines:   `rgba(255,140,0,0.25)`
+- Mixed lines:          `rgba(200,120,200,0.12)`
 
 ## MyceliumCanvas component
 

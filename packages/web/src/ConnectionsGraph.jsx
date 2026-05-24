@@ -3,24 +3,24 @@ import * as d3 from 'd3'
 
 // ─── Palette (matches App.jsx) ────────────────────────────────────────────────
 const C = {
-  bgCard:  '#161624',
+  bgCard:  '#0e0e1a',
   border:  '#2a2a3a',
   cream:   '#e8e4d8',
   dim:     '#8884a0',
   violet:  '#9b72d8',
-  amber:   '#e8a23a',
+  amber:   '#ff8c00',
   gold:    '#c9a84c',
-  purple:  '#6b3fa0',
+  purple:  '#823cff',
   green:   '#6ab88a',
   red:     '#d45a5a',
 }
 
 function nodeColor(type) {
   switch ((type || '').toLowerCase()) {
-    case 'person':   return C.violet
+    case 'person':   return C.purple
     case 'org':      return C.amber
     case 'event':    return C.gold
-    case 'location': return C.purple
+    case 'location': return C.violet
     case 'document': return C.green
     default:         return C.dim
   }
@@ -189,9 +189,10 @@ export default function ConnectionsGraph({ mapData, resData, synthData }) {
     // Main circle
     node.append('circle')
       .attr('r', d => d.r)
-      .attr('fill', d => `${nodeColor(d.type)}cc`)
+      .attr('fill', d => `${nodeColor(d.type)}dd`)
       .attr('stroke', d => nodeColor(d.type))
       .attr('stroke-width', 1.5)
+      .style('filter', d => `drop-shadow(0 0 4px ${nodeColor(d.type)})`)
 
     // Labels
     node.append('text')
