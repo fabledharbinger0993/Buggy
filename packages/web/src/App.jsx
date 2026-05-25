@@ -84,7 +84,8 @@ const SYS_SYNTH = `You are FUNGA.I. synthesizing a completed investigation. \
 Using the entity map and research findings provided, produce a comprehensive, \
 sourced intelligence brief.
 
-Return ONLY valid JSON — no markdown, no explanation, no code fences:
+Return ONLY valid JSON — no markdown, no explanation, no code fences, no preamble. \
+Your response must begin with '{' and end with '}'. Nothing before or after the JSON object.
 {
   "subject": "string",
   "summary": "string",
@@ -527,7 +528,13 @@ function safeJSON(raw) {
     .replace(/^```\s*/i, '')
     .replace(/```\s*$/i, '')
     .trim()
-  try { return JSON.parse(cleaned) } catch { return null }
+  try { return JSON.parse(cleaned) } catch { /* fall through */ }
+  // Extract outermost {...} block in case Claude added preamble/postamble text
+  const match = cleaned.match(/\{[\s\S]*\}/)
+  if (match) {
+    try { return JSON.parse(match[0]) } catch { /* fall through */ }
+  }
+  return null
 }
 
 function confColor(c) {
