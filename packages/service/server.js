@@ -788,6 +788,7 @@ app.post("/memory/store", async (req, res) => {
   const BASE = process.env.HOLOGRAIM_URL;
   if (!BASE) return res.status(503).json({ accepted: false, disabled: true });
   const { content, confidence, source, tags } = req.body || {};
+  if (!content?.trim()) return res.status(400).json({ accepted: false, error: "empty content" });
   try {
     const r = await fetch(`${BASE}/memory/store`, {
       method: "POST",
