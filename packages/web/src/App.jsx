@@ -779,8 +779,8 @@ export default function App() {
       setPhase('mapping')
       setStatusMsg('Querying memory network for prior intelligence…')
       const { memories, neighbors } = await fetchPriorIntelligence(topic)
-      const memCtx      = memories.map(r => r.content).join('\n')
-      const neighborCtx = neighbors.map(n => n.concept).join(', ')
+      const memCtx      = memories.map(r => r.content).join('\n').slice(0, 2000)
+      const neighborCtx = neighbors.slice(0, 20).map(n => n.concept).join(', ')
 
       setStatusMsg('Casting spores — mapping the investigation space…')
 
