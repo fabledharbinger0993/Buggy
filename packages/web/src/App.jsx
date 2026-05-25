@@ -26,14 +26,14 @@ const SYS_MAP = `You are FUNGA.I., an adaptive investigative intelligence system
 Your role is to map the investigation space for the given topic.
 
 Analyse what you know and extract: key entities (people, organisations, events, \
-documents, locations), known relationships, timeline anchors, and the best archive \
-search vectors.
+documents, locations, government bodies, programs, financial nodes, media assets), \
+known relationships, timeline anchors, and the best archive search vectors.
 
 Return ONLY valid JSON — no markdown, no explanation, no code fences:
 {
   "subject": "string",
   "entities": [
-    { "name": "string", "type": "person|org|event|document|location", "notes": "string" }
+    { "name": "string", "type": "person|org|event|document|location|government_body|program|financial|media", "notes": "string" }
   ],
   "relationships": [
     { "from": "string", "to": "string", "relation": "string" }
@@ -45,9 +45,38 @@ Return ONLY valid JSON — no markdown, no explanation, no code fences:
   "archiveSources": ["blackvault","ciaCrest","wikileaks","nsarchive","internetArchive"]
 }`
 
+const SYS_EXPAND = `You are FUNGA.I. extending an investigation network. Given an \
+initial entity map, identify the second-degree connections that are structurally \
+implied but not yet named — adjacent government bodies, intelligence programs, \
+financial nodes, media assets, institutional affiliations, predecessor and successor \
+operations, cross-network patterns.
+
+Think in systems: who funds this, who oversees it, who benefits, what preceded it, \
+what ran in parallel, what was suppressed and by whom. Follow the money, the \
+jurisdiction, and the timeline.
+
+Return ONLY valid JSON — no markdown, no explanation, no code fences, no preamble. \
+Your response must begin with '{' and end with '}'.
+{
+  "expandedEntities": [
+    {
+      "name": "string",
+      "type": "government_body|program|financial|media|person|org|network",
+      "connection": "string (which known entity links here and how)",
+      "priority": "high|medium|low"
+    }
+  ],
+  "systemicPatterns": ["string (cross-cutting structural patterns)"],
+  "suggestedThreads": ["string (specific investigation threads to pursue)"]
+}`
+
 const SYS_RESEARCH = `You are FUNGA.I. conducting deep investigative research. You have \
-been provided an entity map from the SPORE CAST phase and, where available, archive \
-document excerpts.
+been provided an entity map, a second-degree network expansion, and where available, \
+archive document excerpts.
+
+For each entity — primary and expanded — trace one level outward: who funded it, \
+who oversaw it, what preceded or followed it, what parallel programs or operations \
+existed, and what institutional affiliations connect it to broader power structures.
 
 Analyse all evidence. Extract claims with confidence scores (0.0–1.0). Identify \
 corroborated patterns. Flag inconsistencies and evidence gaps.
@@ -736,12 +765,21 @@ export default function App() {
       if (!map) throw new Error('SPORE CAST returned unparseable JSON. Check that the Buggy service is running and the API key is configured.')
       setMapData(map)
 
+      // ── Web Expansion: second-degree network trace ───────────────────────
+      setStatusMsg('Extending the web — tracing second-degree connections…')
+      const rawExpand = await callClaude(
+        EXTRACT_MODEL,
+        SYS_EXPAND,
+        `Investigation topic: ${topic}\n\nEntity map:\n${JSON.stringify(map, null, 2)}`,
+      )
+      if (abortRef.current) return
+      const expand = safeJSON(rawExpand) || {}
+
       // ── Phase 2: MYCELIUM SPREAD ─────────────────────────────────────────
       setPhase('researching')
-      setStatusMsg('Spreading mycelium — deep research underway…')
+      setStatusMsg('Spreading mycelium — querying archive sources…')
 
       let archiveCtx = ''
-      setStatusMsg('Spreading mycelium — querying archive sources…')
       archiveCtx = await callBuggy(topic, map.archiveSources || [])
       if (archiveCtx) setStatusMsg('Spreading mycelium — analysing archive context…')
 
@@ -750,10 +788,14 @@ export default function App() {
         '',
         'Entity map from SPORE CAST:',
         JSON.stringify(map, null, 2),
+        expand.expandedEntities?.length
+          ? `\nSecond-degree network expansion:\n${JSON.stringify(expand, null, 2)}`
+          : '',
         archiveCtx ? `\nArchive context:\n${archiveCtx}` : '',
         '',
-        'Conduct deep research. Extract findings with confidence scores. ' +
-        'Flag all inconsistencies and evidence gaps.',
+        'Conduct deep research. For each entity — primary and expanded — trace ' +
+        'funding, oversight, predecessors, successors, and parallel operations. ' +
+        'Extract findings with confidence scores. Flag all inconsistencies.',
       ].filter(Boolean).join('\n')
 
       const raw2 = await callClaude(EXTRACT_MODEL, SYS_RESEARCH, resPrompt)
