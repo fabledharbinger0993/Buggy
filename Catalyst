@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Repository: Missing & Deceased Researchers — Extended Record</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,600;1,300&family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080809;
+    --surface: #0f0f12;
+    --surface2: #161619;
+    --surface3: #1d1d22;
+    --border: #252530;
+    --border2: #32323f;
+    --gold: #c9a84c;
+    --gold2: #e8c97a;
+    --red: #c45c5c;
+    --amber: #d4813a;
+    --violet: #8b6dbe;
+    --teal: #4a9e8a;
+    --text: #ccc8be;
+    --text2: #908b80;
+    --muted: #585450;
+    --mono: 'IBM Plex Mono', monospace;
+    --serif: 'Cormorant Garamond', Georgia, serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--mono); font-size: 12px; line-height: 1.7; }
+
+  /* ── HEADER ── */
+  .header {
+    padding: 48px 56px 36px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+  .header::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent 0%, var(--gold) 30%, var(--red) 60%, transparent 100%);
+  }
+  .header::after {
+    content: '';
+    position: absolute;
+    bottom: -80px; right: -80px;
+    width: 320px; height: 320px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(201,168,76,0.04) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .eyebrow {
+    font-size: 9px; letter-spacing: 0.3em; text-transform: uppercase;
+    color: var(--gold); margin-bottom: 14px;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-size: clamp(32px, 5vw, 64px);
+    font-weight: 700;
+    color: #ede9df;
+    line-height: 1.05;
+    margin-bottom: 6px;
+  }
+  h1 em { font-style: italic; color: var(--gold); }
+  .subtitle {
+    font-family: var(--serif);
+    font-size: clamp(14px, 2vw, 20px);
+    font-weight: 400;
+    font-style: italic;
+    color: var(--text2);
+    margin-bottom: 24px;
+  }
+  .header-meta {
+    display: flex; flex-wrap: wrap; gap: 20px;
+    font-size: 10px; color: var(--muted);
+    border-top: 1px solid var(--border);
+    padding-top: 16px;
+  }
+  .header-meta span strong { color: var(--text2); }
+
+  /* ── VENN OVERVIEW ── */
+  .venn-section {
+    padding: 32px 56px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .venn-title {
+    font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase;
+    color: var(--gold); margin-bottom: 20px;
+  }
+  .venn-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+  }
+  .venn-node {
+    padding: 14px 16px;
+    border: 1px solid var(--border2);
+    background: var(--surface2);
+    position: relative;
+  }
+  .venn-node-label {
+    font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .venn-node-count {
+    font-family: var(--serif);
+    font-size: 28px; font-weight: 700; line-height: 1;
+    margin-bottom: 4px;
+  }
+  .venn-node-desc { font-size: 10px; color: var(--muted); line-height: 1.5; }
+  .venn-node.nuc .venn-node-label, .venn-node.nuc .venn-node-count { color: var(--red); }
+  .venn-node.aero .venn-node-label, .venn-node.aero .venn-node-count { color: var(--gold); }
+  .venn-node.exotic .venn-node-label, .venn-node.exotic .venn-node-count { color: var(--violet); }
+  .venn-node.intel .venn-node-label, .venn-node.intel .venn-node-count { color: var(--teal); }
+  .venn-node.overlap .venn-node-label, .venn-node.overlap .venn-node-count { color: var(--amber); }
+
+  /* ── CROSSOVER SIGNALS ── */
+  .signals-section {
+    padding: 28px 56px;
+    border-bottom: 1px solid var(--border);
+  }
+  .signals-title {
+    font-size: 9px; letter-spacing: 0.25em; text-transform: uppercase;
+    color: var(--gold); margin-bottom: 16px;
+  }
+  .signals-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 10px;
+  }
+  .signal-item {
+    padding: 12px 14px;
+    border-left: 2px solid;
+    background: var(--surface);
+    font-size: 11px;
+    line-height: 1.5;
+  }
+  .signal-item.red { border-color: var(--red); }
+  .signal-item.amber { border-color: var(--amber); }
+  .signal-item.violet { border-color: var(--violet); }
+  .signal-item.teal { border-color: var(--teal); }
+  .signal-item.gold { border-color: var(--gold); }
+  .signal-count { font-family: var(--serif); font-size: 22px; font-weight: 700; line-height: 1; }
+  .signal-item.red .signal-count { color: var(--red); }
+  .signal-item.amber .signal-count { color: var(--amber); }
+  .signal-item.violet .signal-count { color: var(--violet); }
+  .signal-item.teal .signal-count { color: var(--teal); }
+  .signal-item.gold .signal-count { color: var(--gold); }
+  .signal-label { color: var(--text2); margin-top: 4px; }
+
+  /* ── SUMMARY BAR ── */
+  .summary-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    border-bottom: 1px solid var(--border);
+  }
+  .stat {
+    padding: 18px 28px; border-right: 1px solid var(--border);
+    text-align: center;
+  }
+  .stat:last-child { border-right: none; }
+  .stat-num { font-family: var(--serif); font-size: 32px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
+  .stat-label { font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); }
+  .stat.d .stat-num { color: var(--red); }
+  .stat.m .stat-num { color: var(--gold); }
+  .stat.t .stat-num { color: #ede9df; }
+  .stat.span .stat-num { color: var(--violet); }
+  .stat.era .stat-num { color: var(--teal); }
+
+  /* ── FILTER BAR ── */
+  .filter-bar {
+    padding: 14px 56px; border-bottom: 1px solid var(--border);
+    display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+    background: var(--surface);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .filter-label { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.2em; margin-right: 6px; }
+  .fbtn {
+    background: transparent; border: 1px solid var(--border2);
+    color: var(--muted); font-family: var(--mono); font-size: 9px;
+    letter-spacing: 0.12em; padding: 5px 10px; cursor: pointer;
+    text-transform: uppercase; transition: all 0.12s;
+  }
+  .fbtn:hover { border-color: var(--gold); color: var(--gold); }
+  .fbtn.active { background: var(--gold); border-color: var(--gold); color: var(--bg); font-weight: 600; }
+  .sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+
+  /* ── ERA HEADERS ── */
+  .era-header {
+    padding: 24px 56px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: baseline; gap: 16px;
+    background: var(--bg);
+  }
+  .era-title {
+    font-family: var(--serif); font-size: 24px; font-weight: 600;
+    font-style: italic;
+  }
+  .era-sub { font-size: 10px; color: var(--muted); }
+  .era-1 .era-title { color: var(--violet); }
+  .era-2 .era-title { color: var(--teal); }
+  .era-3 .era-title { color: var(--amber); }
+  .era-4 .era-title { color: var(--gold); }
+
+  /* ── GRID ── */
+  .grid {
+    padding: 2px 56px 2px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 2px;
+  }
+  .grid-gap { padding: 2px; }
+
+  /* ── CARD ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 22px;
+    position: relative;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .card:hover { background: var(--surface2); border-color: var(--border2); }
+  .card.dead { border-left: 3px solid var(--red); }
+  .card.missing { border-left: 3px solid var(--gold); }
+  .card.underground { border-left: 3px solid var(--violet); }
+
+  .card-badge {
+    position: absolute; top: 14px; right: 14px;
+    font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase;
+    padding: 2px 7px; border: 1px solid;
+  }
+  .card.dead .card-badge { color: var(--red); border-color: var(--red); }
+  .card.missing .card-badge { color: var(--gold); border-color: var(--gold); }
+  .card.underground .card-badge { color: var(--violet); border-color: var(--violet); }
+
+  .card-idx { font-size: 9px; color: var(--muted); margin-bottom: 6px; }
+  .card-name {
+    font-family: var(--serif); font-size: 19px; font-weight: 700;
+    color: #ede9df; line-height: 1.15; margin-bottom: 3px;
+  }
+  .card-role { font-size: 10px; color: var(--gold); margin-bottom: 14px; line-height: 1.4; }
+  .card-when { font-size: 10px; color: var(--text2); margin-bottom: 14px; }
+  .card-when strong { color: var(--text); }
+
+  .row { margin-bottom: 12px; }
+  .row-lbl {
+    font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 4px;
+    border-bottom: 1px solid var(--border); padding-bottom: 2px;
+  }
+  .row-body { font-size: 11px; color: var(--text); line-height: 1.55; }
+
+  .flag {
+    margin-top: 12px; padding: 9px 11px;
+    background: rgba(196,92,92,0.07); border: 1px solid rgba(196,92,92,0.25);
+    font-size: 10px; color: #dda0a0; line-height: 1.5;
+  }
+  .flag::before {
+    content: '⚑ ';
+    font-size: 8px; letter-spacing: 0.15em; text-transform: uppercase;
+    font-weight: 600;
+  }
+
+  .overlap-bar {
+    margin-top: 12px; padding: 8px 10px;
+    background: rgba(139,109,190,0.07); border: 1px solid rgba(139,109,190,0.2);
+    font-size: 10px; color: #b89edd; line-height: 1.5;
+  }
+  .overlap-bar::before { content: '◈ VENN OVERLAP: '; font-size: 8px; letter-spacing: 0.12em; }
+
+  .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; }
+  .tag {
+    font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 2px 6px; background: var(--surface2); border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .tag.r { border-color: rgba(196,92,92,0.4); color: var(--red); }
+  .tag.g { border-color: rgba(74,158,138,0.4); color: var(--teal); }
+  .tag.v { border-color: rgba(139,109,190,0.4); color: var(--violet); }
+  .tag.a { border-color: rgba(212,129,58,0.4); color: var(--amber); }
+  .tag.gd { border-color: rgba(201,168,76,0.4); color: var(--gold); }
+
+  /* hidden */
+  .card.h { display: none; }
+  .era-block.h { display: none; }
+
+  /* DISCLAIMER */
+  .disc {
+    margin: 24px 56px 56px;
+    padding: 18px 22px; border: 1px solid var(--border);
+    font-size: 10px; color: var(--muted); line-height: 1.7;
+  }
+  .disc strong { color: var(--text2); }
+
+  @media (max-width: 640px) {
+    .header, .signals-section, .venn-section, .filter-bar,
+    .grid, .disc, .era-header { padding-left: 18px; padding-right: 18px; }
+    .grid { grid-template-columns: 1fr; }
+    h1 { font-size: 28px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="eyebrow">Extended Investigative Repository — Public Record Compilation</div>
+  <h1>The Long Pattern:<br><em>Researchers, Operators &amp; Witnesses</em></h1>
+  <p class="subtitle">Deaths &amp; Disappearances in Advanced U.S. &amp; Allied Research Programs — 1982 to Present</p>
+  <div class="header-meta">
+    <span><strong>Period:</strong> 1982–2026</span>
+    <span><strong>Confirmed Federal Investigation:</strong> FBI / DOE / DOW — April 2026</span>
+    <span><strong>Congressional Action:</strong> House Oversight Committee formal inquiry — April 2026</span>
+    <span><strong>Primary Domains:</strong> Nuclear · Aerospace · Anti-Gravity / Exotic Propulsion · Plasma/Fusion · Defense Intelligence · Pharma</span>
+    <span><strong>Sources:</strong> Newsweek, CNN, FOX, CBS, Daily Mail, NY Post, CrimeReads, The Unredacted, Wikipedia, public record</span>
+  </div>
+</div>
+
+<!-- VENN DOMAIN OVERVIEW -->
+<div class="venn-section">
+  <div class="venn-title">Domain Overlap Map — Crossover Variables</div>
+  <div class="venn-grid">
+    <div class="venn-node nuc">
+      <div class="venn-node-label">Nuclear / Weapons</div>
+      <div class="venn-node-count">12</div>
+      <div class="venn-node-desc">LANL · KCNSC · DOE · weapons assembly · materials for nuclear delivery systems</div>
+    </div>
+    <div class="venn-node aero">
+      <div class="venn-node-label">Aerospace / Space</div>
+      <div class="venn-node-count">14</div>
+      <div class="venn-node-desc">JPL · AFRL · planetary defense · satellite systems · reusable space vehicle propulsion</div>
+    </div>
+    <div class="venn-node exotic">
+      <div class="venn-node-label">Exotic / Anti-Gravity</div>
+      <div class="venn-node-count">6</div>
+      <div class="venn-node-desc">Anti-gravity propulsion · zero-point energy · gravitomagnetics · plasma physics near-breakthrough</div>
+    </div>
+    <div class="venn-node intel">
+      <div class="venn-node-label">Defense Intelligence</div>
+      <div class="venn-node-count">9</div>
+      <div class="venn-node-desc">NSA · NASIC · AFRL classified programs · SDI contracts · UAP programs</div>
+    </div>
+    <div class="venn-node overlap">
+      <div class="venn-node-label">Multi-Domain Overlap</div>
+      <div class="venn-node-count">8</div>
+      <div class="venn-node-desc">Cases touching 3+ domains simultaneously — highest-density signal zone</div>
+    </div>
+  </div>
+</div>
+
+<!-- CROSSOVER SIGNAL PATTERNS -->
+<div class="signals-section">
+  <div class="signals-title">Recurring Circumstantial Signatures — Cross-Era Pattern Recognition</div>
+  <div class="signals-grid">
+    <div class="signal-item red">
+      <div class="signal-count">11</div>
+      <div class="signal-label">"Walked away on foot" — left behind phone, keys, wallet, or prescription items necessary for any intended journey. No vehicle. No digital trail.</div>
+    </div>
+    <div class="signal-item amber">
+      <div class="signal-count">9</div>
+      <div class="signal-label">No cause of death disclosed publicly. No autopsy confirmed. Institutional silence from employing agency (NASA, MOD, AFRL).</div>
+    </div>
+    <div class="signal-item violet">
+      <div class="signal-count">7</div>
+      <div class="signal-label">Death or disappearance preceded by documented pre-mortem warning — explicit denial of suicidal intent, fear of targeting, or prior claim of harassment.</div>
+    </div>
+    <div class="signal-item teal">
+      <div class="signal-count">8</div>
+      <div class="signal-label">"Witness-present disappearance" — last seen by companion, surveillance, or bystander. No physical trace recovered despite search.</div>
+    </div>
+    <div class="signal-item gold">
+      <div class="signal-count">14+</div>
+      <div class="signal-label">Death ruled suicide or accident where physical circumstances were described by experts, family, or investigators as inconsistent with ruling.</div>
+    </div>
+    <div class="signal-item red">
+      <div class="signal-count">6</div>
+      <div class="signal-label">Researcher was at or near a documented breakthrough, was scheduled to testify, or had recently pivoted toward public disclosure when they died or vanished.</div>
+    </div>
+  </div>
+</div>
+
+<!-- SUMMARY BAR -->
+<div class="summary-bar">
+  <div class="stat t"><div class="stat-num">40+</div><div class="stat-label">Total Documented</div></div>
+  <div class="stat d"><div class="stat-num">28+</div><div class="stat-label">Confirmed Deceased</div></div>
+  <div class="stat m"><div class="stat-num">9+</div><div class="stat-label">Missing / Unresolved</div></div>
+  <div class="stat span"><div class="stat-num">44yr</div><div class="stat-label">Time Span</div></div>
+  <div class="stat era"><div class="stat-num">4</div><div class="stat-label">Distinct Waves</div></div>
+</div>
+
+<!-- FILTER BAR -->
+<div class="filter-bar">
+  <span class="filter-label">Filter:</span>
+  <button class="fbtn active" onclick="filter('all',this)">All</button>
+  <button class="fbtn" onclick="filter('dead',this)">Deceased</button>
+  <button class="fbtn" onclick="filter('missing',this)">Missing</button>
+  <div class="sep"></div>
+  <button class="fbtn" onclick="filter('nuclear',this)">Nuclear</button>
+  <button class="fbtn" onclick="filter('aerospace',this)">Aerospace</button>
+  <button class="fbtn" onclick="filter('exotic',this)">Anti-Gravity/Exotic</button>
+  <button class="fbtn" onclick="filter('intel',this)">Defense Intel / UAP</button>
+  <div class="sep"></div>
+  <button class="fbtn" onclick="filter('flag',this)">Anomaly Flagged</button>
+  <button class="fbtn" onclick="filter('warned',this)">Pre-Death Warning</button>
+</div>
+
+<div id="main"></div>
+
+<div class="disc">
+  <strong>Epistemic standards applied to this document:</strong> Every case is sourced from public record journalism, government proceedings, or Wikipedia. Claims are categorised as demonstrated (official record), reported (credible journalism), or noted (secondary/single-source). The Marconi/SDI wave is documented through parliamentary inquiry, journalist Tony Collins' contemporaneous reporting in <em>Computer Weekly</em>, and multiple published books. The modern wave (2022–2026) is the subject of an active FBI and congressional investigation confirmed in April 2026. No causal link between cases across eras has been officially confirmed. Pattern recognition across eras is presented as adaptive reasoning — correlative, not causal. The absence of an official explanation for a pattern is itself a documented fact.
+</div>
+
+<script>
+const eras = [
+  {
+    id: 'era1',
+    label: 'Wave I: The Marconi / SDI Cluster',
+    sub: '1982–1990 · United Kingdom · GEC-Marconi / Ministry of Defence / Strategic Defense Initiative',
+    cls: 'era-1',
+    cases: [
+      {
+        id:'M01', name:'The Marconi/SDI Scientists', role:'25+ Defence Engineers — GEC-Marconi & Ministry of Defence',
+        status:'dead', badge:'25+ Deceased',
+        when:'1982–1990 · United Kingdom',
+        expertise:'Sonar technology · submarine detection · radar and electronic warfare · missile guidance · space-based anti-missile systems (SDI Star Wars program) · Sting Ray torpedo project · satellite detection systems',
+        affiliation:'GEC-Marconi (UK defence subsidiary of General Electric Company UK) · MOD · British Aerospace · Plessey Defence Systems',
+        ruling:'Officially: suicide or accident across all cases. No prosecution. No formal inquiry ever held.',
+        circumstances:'Over 25 scientists and engineers employed on classified SDI and British defence contracts died between 1982–1990. The most concentrated cluster occurred August 1986 to October 1988. Methods included: carbon monoxide poisoning (multiple), hanging, drowning (in shallow water, hands and feet bound — ruled suicide), car crashes into buildings, drug overdose, plastic bag over head (ruled "accidental" in at least one case), and self-decapitation via rope attached to tree and accelerator. One individual — Shani Warren — was found in under 20 inches of water with hands tied behind back, feet bound, gagged, noose around neck; a knot expert hired by police testified it was physically impossible she had tied herself. American Embassy officials told <em>The Sunday Times</em> they were aware of at least 10 additional victims and had been monitoring reports for 18 months. A counter-terrorism expert from Oxford stated: "These are not normal types of accidents and suicides."',
+        warning:'Several widows reported their husbands had expressed fear or stress about their classified work but were contractually prohibited from discussing it. Arshad Sharif had been "acting strangely" in days before his death.',
+        overlap:'All tied to SDI (space-based weapons defense) at height of Cold War. Specific classified programs included sonar, radar, missile guidance, and satellite detection — identical domain vectors to 2022–2026 cluster.',
+        tags:['marconi','sdi','star-wars','MOD','UK-defence','cold-war','mass-cluster','no-inquiry'],
+        flag:true, warned:false,
+        domain:['aerospace','intel'],
+      },
+    ]
+  },
+  {
+    id: 'era2',
+    label: 'Wave II: The Microbiologist Cluster',
+    sub: '2001–2004 · USA / UK / Australia · Biodefense / Infectious Disease Research',
+    cls: 'era-2',
+    cases: [
+      {
+        id:'B01', name:'Don C. Wiley', role:'Harvard Microbiologist — Biodefense & Biochemistry (Nobel-nominated)',
+        status:'dead', badge:'Deceased',
+        when:'Disappeared November 16, 2001 · Body found December 20, 2001 · Memphis, Tennessee',
+        expertise:'Infectious disease mechanisms · structural biology · how viruses attack cells · rumoured Nobel Prize candidate',
+        affiliation:'Harvard University · St. Jude Children\'s Research Hospital (annual banquet host)',
+        ruling:'Ruled accident — investigators concluded he got dizzy on the Memphis bridge and fell into the river. Rental car found abandoned on the Hernando DeSoto bridge with full tank of gas, keys in ignition.',
+        circumstances:'Disappeared after leaving a Peabody Hotel banquet. Car found pointing west on the bridge — keys in ignition, full tank. Body found 320 miles downstream, four weeks later, snagged on a tree near Vidalia, Louisiana. Wallet still in pocket. Body badly degraded. One of nine world-leading microbiologists to die within a five-month period in 2001–2002.',
+        warning:'None documented publicly.',
+        overlap:'Part of the 2001–2002 cluster of 9 microbiologists, all working on biological warfare defense or pathogen research — coinciding with the 2001 anthrax letter attacks. Domain: biodefense / dual-use.',
+        tags:['harvard','microbiologist','biodefense','2001-cluster','bridge','no-explanation'],
+        flag:true, warned:false,
+        domain:['intel'],
+      },
+      {
+        id:'B02', name:'The 2001–2002 Microbiologist Cluster', role:'9 World-Leading Microbiologists — Biodefense, Biowarfare Defense, DNA Sequencing',
+        status:'dead', badge:'9 Deceased',
+        when:'November 2001 – March 2002',
+        expertise:'Infectious diseases · DNA sequencing · bioterrorism countermeasures · weapons-grade pathogen research and prevention · cellular biology',
+        affiliation:'Harvard · Miami Medical School · UK national research agencies · Geelong Institute of Animal Health (Australia) · Moscow institutions (Russian defectors)',
+        ruling:'Across 9 cases: beating (carjacking), river fall, stroke, stabbing, airlock nitrogen asphyxiation, head injury. Several open verdicts.',
+        circumstances:'Benito Que (beaten, Miami parking lot, died later) · Don Wiley (fell from bridge, body found 320mi downstream) · Vladimir Pasechnik (stroke — former high-level Russian defector who had worked on biological weapons for the USSR) · Robert Schwartz (stabbed, Leesburg VA — three Satanists arrested) · Nguyen Van Set (died in airlock filled with nitrogen, Geelong Australia) · Victor Korshunov (head bashed in, Moscow) · Ian Langford (Norwich UK — found dead, partially naked, wedged under chair) · Tanya Holzmayer (shot by former colleague) · David Wynn-Williams (hit by car while jogging). Nine of the world\'s leading microbiologists dead within approximately five months.',
+        warning:'None documented across the cluster.',
+        overlap:'All nine connected to biological warfare defense, pathogen detection, or bioterrorism countermeasures. Timing overlaps directly with the 2001 anthrax letter attacks targeting U.S. Senate offices.',
+        tags:['microbiologist','biodefense','anthrax-era','2001-cluster','russia-connection','multi-country'],
+        flag:true, warned:false,
+        domain:['intel'],
+      },
+    ]
+  },
+  {
+    id: 'era3',
+    label: 'Wave III: The Anti-Gravity / Exotic Science Interval',
+    sub: 'c. 1999–2022 · USA · Huntsville, Alabama axis · Anti-Gravity, Zero-Point Energy, UAP-adjacent Research',
+    cls: 'era-3',
+    cases: [
+      {
+        id:'AG01', name:'Dr. Ning Li', role:'Physicist — Anti-Gravity Research · University of Alabama in Huntsville / NASA Marshall / DoD',
+        status:'underground', badge:'Withdrew / Deceased',
+        when:'Withdrew from public ~2000 · Died July 27, 2021 · Huntsville, Alabama',
+        expertise:'Anti-gravity theory via rotating ions producing gravitomagnetic fields perpendicular to spin axis · near-zero superconductors · practical anti-gravity device design. Peer-reviewed published between 1991–1993. Her work attracted direct involvement and funding from NASA\'s Marshall Space Flight Center.',
+        affiliation:'University of Alabama in Huntsville — Center for Space Plasma and Aeronomic Research (CSPAR) · NASA Marshall Space Flight Center · U.S. Army · Department of Defense (received $450,000+ DoD contract) · AC Gravity LLC (her company, founded 1999)',
+        ruling:'Died July 27, 2021 of injuries sustained in an earlier vehicle strike. Age 78.',
+        circumstances:'After receiving a DoD contract and reportedly demonstrating levitation to a journalist in 1999, she left UAH to found AC Gravity LLC, taking colleagues including her department chair with her. From ~2000 onward, journalists could not reach her. In 2008, physicist Jack Sarfatti stated in a YouTube interview: "One of the key scientists is a Chinese woman named Ning Li. She has disappeared and gone back to China. The people at the Pentagon cannot reach her anymore." Her son has stated she never left Alabama and that she was struck by a vehicle, suffering brain damage, and died years later from those injuries. DoD and Pentagon access claims remain unresolved.',
+        warning:'A 2008 interview by Jack Sarfatti (physicist) flagged her as unreachable by Pentagon — treated by defense circles as a national security concern regarding research access.',
+        overlap:'Direct predecessor to Amy Eskridge — same domain (anti-gravity, Huntsville Alabama), same institutional framework (NASA Marshall, DoD), same withdrawal pattern after DoD funding. Eskridge explicitly cited Li\'s work. Both connected to same Huntsville aerospace corridor.',
+        tags:['anti-gravity','nasa-marshall','dod-funded','huntsville','gravitomagnetics','withdrew-from-public','eskridge-predecessor'],
+        flag:true, warned:false,
+        domain:['exotic','aerospace'],
+      },
+      {
+        id:'AG02', name:'Prof. John Mack', role:'Harvard Psychiatrist · Pulitzer Prize Winner · UAP / Abduction Research',
+        status:'dead', badge:'Deceased',
+        when:'September 27, 2004 · London, United Kingdom',
+        expertise:'Psychiatry · trauma research · consciousness · published clinical research on individuals reporting UAP contact and abduction experiences. Pulitzer Prize winner. Harvard tenure.',
+        affiliation:'Harvard Medical School · Program for Extraordinary Experience Research (PEER)',
+        ruling:'Struck by a drunk driver in London while walking on a pavement. Ruled accident.',
+        circumstances:'Died in London after being hit by a drunk driver while walking on a pavement. The incident occurred when he was in London for a conference. Physicist John Brandenburg publicly noted this death in context of the 2026 scientist deaths, observing that Mack — like Ning Li — was struck by a vehicle after entering UAP-adjacent research territory.',
+        warning:'None documented.',
+        overlap:'Represents the academic/psychiatric domain of UAP research suppression. His clinical work legitimized experiencer testimony; his removal eliminated an institutionally credible voice for UAP research. Cited by researchers in context of the 2026 deaths cluster.',
+        tags:['harvard','pulitzer','uap-research','struck-by-vehicle','abduction-researcher'],
+        flag:false, warned:false,
+        domain:['exotic','intel'],
+      },
+      {
+        id:'AG03', name:'Amy Eskridge', role:'CEO / Founder, Institute for Exotic Science — Anti-Gravity, Zero-Point Energy, Advanced Propulsion',
+        status:'dead', badge:'Deceased — Contested',
+        when:'June 11, 2022 · Huntsville, Alabama',
+        expertise:'Anti-gravity technology · advanced propulsion · zero-point energy · quantum computing · metamaterial science · gravity modification. Co-founded Institute for Exotic Science with her father (former NASA employee). Stated mission: "bring gravity research into the open."',
+        affiliation:'Institute for Exotic Science (Public Benefit Corp) · Huntsville aerospace corridor · adjacent networks included Redstone Arsenal, NASA Marshall Space Flight Center',
+        ruling:'Officially: suicide by self-inflicted gunshot wound to the head. No public investigative report released by police or medical examiner.',
+        circumstances:'Found dead June 11, 2022, age 34. No public autopsy released. Prior to death she documented that she and her team were being subjected to "harassment and psychological warfare" aimed at stopping her research. She reported being targeted by directed energy weapons and described burn marks on her hands. A former British intelligence officer told NewsNation she feared for her life. Her father — a former NASA employee — maintains the death is not suspicious.',
+        warning:'DOCUMENTED — approximately one month before death, sent message to business partner Samuel Reed: "If you see any report that I killed myself, I most definitely did not. If you see any report that I overdosed, I most definitely did not. If you see any report that I killed anyone else, I most definitely did not." Also claimed on-record in 2020/2021 interviews that she was receiving threats in connection with planned UAP/ET disclosure.',
+        overlap:'Direct domain continuity with Ning Li (same city, same research area, same institutional adjacency). She was working in Huntsville, the same corridor as Li. Her Institute for Exotic Science represents the third generation of the anti-gravity line (Li → Eskridge). FBI investigation includes her case as potential 11th entry.',
+        tags:['anti-gravity','huntsville','nasa-adjacent','uap-disclosure','pre-death-warning','suicide-contested','institute-exotic-science'],
+        flag:true, warned:true,
+        domain:['exotic','aerospace'],
+      },
+    ]
+  },
+  {
+    id: 'era4',
+    label: 'Wave IV: The Modern Cluster — Active Federal Investigation',
+    sub: '2023–2026 · USA · NASA/JPL · Los Alamos · MIT · AFRL · FBI/Congressional investigation ongoing',
+    cls: 'era-4',
+    cases: [
+      {
+        id:'C01', name:'Michael David Hicks', role:'Research Scientist, NASA Jet Propulsion Laboratory (1998–2022)',
+        status:'dead', badge:'Deceased',
+        when:'July 30, 2023 · Los Angeles area',
+        expertise:'Comets · asteroids · DART Project (asteroid deflection) · Deep Space 1 Mission · Near Earth Asteroid Tracking · Dawn Mission. Published 80+ peer-reviewed papers.',
+        affiliation:'NASA JPL',
+        ruling:'Cause of death never publicly disclosed. No autopsy confirmed. No statement from NASA or JPL.',
+        circumstances:'Died one year after leaving JPL. Age 59. No reported prior health issues. No institutional comment from NASA.',
+        warning:'None documented.',
+        overlap:'First JPL scientist in what became a cluster of 3 JPL deaths/disappearances (Hicks → Maiwald → Reza) within 24 months at the same institution.',
+        tags:['nasa-jpl','dart-project','no-cause-disclosed','no-autopsy','jpl-cluster'],
+        flag:true, warned:false,
+        domain:['aerospace'],
+      },
+      {
+        id:'C02', name:'Matthew James Sullivan', role:'Air Force Intelligence Officer — NASIC, NSA, Air Force Intelligence Agency',
+        status:'dead', badge:'Deceased',
+        when:'May 12, 2024 · Falls Church, Virginia',
+        expertise:'Defense intelligence · UAP / unidentified anomalous phenomena programs · crash-retrieval legacy programs. Served at National Air and Space Intelligence Center (NASIC) and NSA. Bronze Star recipient (Operation Enduring Freedom).',
+        affiliation:'U.S. Air Force Intelligence Agency · National Air and Space Intelligence Center (NASIC) · National Security Agency (NSA)',
+        ruling:'Accidental drug overdose — official ruling released April 2026, two years after death. Cause: lethal combination of alcohol, alprazolam (Xanax), cyclobenzaprine (muscle relaxant), and imipramine (antidepressant/anxiety medication).',
+        circumstances:'Died weeks after committing to testify before Congress at hearings scheduled for November 2024. According to sources, Sullivan had firsthand knowledge of "legacy UFO programs" — covert crash-retrieval efforts spanning multiple U.S. government agencies. Rep. Eric Burlison wrote to FBI Director Kash Patel citing "implications for national security" and requesting investigation. The IC OIG has refused to confirm or deny anything. Congressional hearings proceeded in November 2024 without his testimony.',
+        warning:'REPORTED — Sources indicate Sullivan had communicated his intent to disclose specific classified UAP program details to Congressional investigators. The commitment to testify itself represents an on-record signaling of intent.',
+        overlap:'Direct UAP-intelligence pathway. Connection to David Grusch (2023 Congressional testimony on UAP crash retrieval and non-human biologics). Sullivan\'s death eliminated a source with firsthand NASIC and NSA access to UAP program specifics. Two years elapsed before cause of death was officially released.',
+        tags:['air-force-intel','NASIC','NSA','uap-whistleblower','pre-testimony-death','overdose','two-year-delay-ruling'],
+        flag:true, warned:true,
+        domain:['intel','aerospace'],
+      },
+      {
+        id:'C03', name:'Frank Maiwald', role:'Principal Researcher, NASA Jet Propulsion Laboratory',
+        status:'dead', badge:'Deceased',
+        when:'July 4, 2024 · Los Angeles, California · Age 61',
+        expertise:'"Principal Researcher" — a JPL designation reserved for scientists making outstanding individual contributions. Space research.',
+        affiliation:'NASA JPL',
+        ruling:'Cause of death never made public. No autopsy confirmed. No public statement from NASA or JPL.',
+        circumstances:'Second JPL scientist to die within 12 months (follows Hicks). Died on U.S. Independence Day. No institutional comment.',
+        warning:'None documented.',
+        overlap:'Part of JPL triple-cluster with Hicks and Reza. Three JPL scientists dead or missing within 24 months. No cause disclosed in any of the three.',
+        tags:['nasa-jpl','no-cause-disclosed','no-autopsy','jpl-cluster','principal-researcher'],
+        flag:true, warned:false,
+        domain:['aerospace'],
+      },
+      {
+        id:'C04', name:'Anthony Chavez', role:'Former Construction Foreman / Employee, Los Alamos National Laboratory',
+        status:'missing', badge:'Missing',
+        when:'Missing since May 4–8, 2025 · Los Alamos / New Mexico',
+        expertise:'Construction oversight at LANL. Age reportedly 78.',
+        affiliation:'Los Alamos National Laboratory (former)',
+        ruling:'Missing. No resolution.',
+        circumstances:'Left home on foot. Left behind wallet, keys, phone. A friend\'s Facebook post reported the circumstances. One of four New Mexico-based individuals connected to sensitive sites to go missing within approximately one year.',
+        warning:'None documented.',
+        overlap:'Anchor case of the New Mexico cluster (Chavez → Casias → Garcia → McCasland). All four departed on foot without digital devices.',
+        tags:['los-alamos','nuclear','on-foot','no-devices','new-mexico-cluster'],
+        flag:false, warned:false,
+        domain:['nuclear'],
+      },
+      {
+        id:'C05', name:'Monica Reza', role:'Director of Materials Processing, NASA JPL · Aerospace Engineer',
+        status:'missing', badge:'Missing',
+        when:'Missing since June 22, 2025 · Angeles National Forest, California · Age 60',
+        expertise:'Materials science · developed patented nickel-based superalloy "Mondaloy" for reusable space vehicles and advanced weapons platforms · burn-resistant high-strength metal alloys · worked under AFRL funding program overseen by McCasland in early 2000s.',
+        affiliation:'NASA JPL (Director, Materials Processing Group) · Aerojet Rocketdyne (NASA/AFRL funded) · AFRL Kirtland Air Force Base connection',
+        ruling:'Missing person. Extensive 2025 search in Angeles National Forest. No trace found.',
+        circumstances:'Vanished during a hike. Two friends were approximately 30 feet away — one looked back and she was gone, last seen smiling and waving. No physical evidence recovered despite extensive search. Had recently started Director role at JPL. Directly professionally connected to McCasland through early 2000s AFRL Mondaloy research.',
+        warning:'None documented prior to disappearance.',
+        overlap:'Professional link to McCasland (also missing — both tied to AFRL Kirtland and advanced materials for space weapons). Mondaloy superalloy represents a specific classified aerospace capability. Third JPL figure in 24-month cluster.',
+        tags:['nasa-jpl','materials-science','mondaloy','superalloy','witnesses-present','no-trace','mccasland-linked','jpl-cluster'],
+        flag:true, warned:false,
+        domain:['aerospace','nuclear'],
+      },
+      {
+        id:'C06', name:'Melissa Casias', role:'Administrative Worker (Security-Cleared), Los Alamos National Laboratory',
+        status:'missing', badge:'Missing',
+        when:'Missing since June 26, 2025 · New Mexico · Age 53',
+        expertise:'Administrative — reported top security clearance for sensitive data at LANL. Drove her husband Mark (also a LANL employee) to work on the morning she disappeared.',
+        affiliation:'Los Alamos National Laboratory',
+        ruling:'Missing. Unsolved.',
+        circumstances:'Disappeared 4 days after Reza. Last seen on surveillance footage walking along a highway several miles from her home. Both personal and work phones found at home, factory-reset and wiped clean after her disappearance. Two months after disappearance, NM State Police reported no breakthroughs.',
+        warning:'None documented.',
+        overlap:'Phones wiped to factory settings after departure — active evidence suppression or remotely-triggered device wipe. Part of New Mexico cluster. Disappeared 4 days after Reza despite being geographically and institutionally separate.',
+        tags:['los-alamos','nuclear','phones-wiped','highway-surveillance','new-mexico-cluster','evidence-destruction'],
+        flag:true, warned:false,
+        domain:['nuclear'],
+      },
+      {
+        id:'C07', name:'Steven Garcia', role:'Government Contractor — Kansas City National Security Campus (Albuquerque Facility)',
+        status:'missing', badge:'Missing',
+        when:'Missing since August 28, 2025 · Albuquerque, New Mexico · Age 48',
+        expertise:'Property custodian for tens to hundreds of millions of dollars in equipment and assets, some classified. Top security clearance. Broad facility-wide access. KCNSC manufactures 80%+ of all non-nuclear components for U.S. military nuclear weapons.',
+        affiliation:'Kansas City National Security Campus — Albuquerque facility (nuclear weapons manufacturing)',
+        ruling:'Missing. Police note he "may be a danger to himself."',
+        circumstances:'Walked out of home at ~9AM in camouflage shirt, shorts, carrying a handgun. Did not take vehicle, phone, or other essentials. KCNSC searched his work computers, emails, and files in days following — found nothing. An anonymous source familiar with Garcia disputed the suicide risk assessment entirely: "He was a very stable person. The possibility of him being targeted by foreign intelligence services makes the most sense."',
+        warning:'REPORTED — Source close to Garcia disputed official suicide-risk framing and suggested foreign intelligence targeting.',
+        overlap:'KCNSC is a nuclear weapons manufacturing nexus. Garcia\'s custodial role over classified assets represents a high-value intelligence target. Departure pattern mirrors McCasland (on foot, no devices, handgun).',
+        tags:['nuclear-weapons','kcnsc','on-foot','handgun','new-mexico-cluster','foreign-intel-suspected'],
+        flag:true, warned:true,
+        domain:['nuclear'],
+      },
+      {
+        id:'C08', name:'Nuno F.G. Loureiro', role:'Director, MIT Plasma Science and Fusion Center · Professor of Nuclear Science & Physics',
+        status:'dead', badge:'Deceased',
+        when:'December 15, 2025 · Brookline, Massachusetts · Age 47',
+        expertise:'Plasma physics · nuclear fusion · clean energy applications. Director of MIT\'s Plasma Science and Fusion Center. Reportedly near a significant breakthrough in plasma physics and fusion energy at time of death.',
+        affiliation:'MIT — Plasma Science and Fusion Center',
+        ruling:'Homicide. Fatally shot at his home. The same gunman also opened fire at Brown University, killing two students. Suspect identified as Claudio Manuel Neves Valente — described as a former classmate from Portugal.',
+        circumstances:'Shot at his Brookline home as part of a multi-site shooting event. Suspect is a "former classmate" from Portugal — a personal connection that implies prior knowledge of Loureiro\'s location and routine. A fusion energy director reportedly near a breakthrough killed in a personal-connection shooting.',
+        warning:'None documented.',
+        overlap:'Near-breakthrough timing. Domain: plasma physics and fusion energy — a potential civilization-scale energy technology. Personal-connection perpetrator (former classmate) eliminates random-stranger framing while raising questions about origin of targeting information.',
+        tags:['mit','fusion-energy','plasma-physics','homicide','near-breakthrough','personal-connection-shooter'],
+        flag:true, warned:false,
+        domain:['nuclear','exotic'],
+      },
+      {
+        id:'C09', name:'William "Neil" McCasland', role:'Retired U.S. Air Force Major General — AFRL Commander',
+        status:'missing', badge:'Missing',
+        when:'Missing since February 27, 2026 · Albuquerque, New Mexico · Age 68',
+        expertise:'Commanded AFRL $2.2B science and technology program at Wright-Patterson AFB · Commanded Phillips Research Site at Kirtland AFB · Oversaw Air Force funding of advanced materials research for reusable space vehicles and advanced weapons (including Reza\'s Mondaloy work) · Appeared in 2016 Wikileaks emails as advisor on UFO disclosure.',
+        affiliation:'U.S. Air Force (retired) · AFRL Wright-Patterson AFB · Phillips Research Site / Kirtland AFB · professionally linked to Monica Reza',
+        ruling:'Missing. FBI involved.',
+        circumstances:'Walked out of Albuquerque home on foot on Feb 27. Left behind phone, prescription glasses, all wearable devices. Took wallet and .38-caliber revolver. His wife reported him missing. Prior to disappearance, McCasland had cited "mental fog" when leaving several research groups — a stated cognitive decline that may explain, or may contextualize, the disappearance. Wright-Patterson AFB has been associated with UAP material storage in congressional testimony and public record.',
+        warning:'REPORTED — 2016 Wikileaks emails identify McCasland as an advisor on UAP/UFO disclosure. His former role at Wright-Patterson (historically the most UAP-cited USAF installation) represents a documented proximity to classified UAP material.',
+        overlap:'Convergence node: nuclear + aerospace + UAP intel + Reza professional link. Highest multi-domain overlap in modern cluster. Departure signature mirrors Chavez, Casias, Garcia (on foot, no devices).',
+        tags:['military-general','wright-patterson','uap-linked','afrl','on-foot','no-devices','reza-linked','new-mexico-cluster','wikileaks'],
+        flag:true, warned:true,
+        domain:['aerospace','nuclear','intel','exotic'],
+      },
+      {
+        id:'C10', name:'Carl Grillmair', role:'Astrophysicist, Caltech / NASA JPL collaborative',
+        status:'dead', badge:'Deceased',
+        when:'February 16, 2026 · Antelope Valley, California · Age 67',
+        expertise:'Astrophysics · NASA NEOWISE and NEO Surveyor missions (near-Earth object tracking / planetary defense) · missile tracking technology for U.S. Air Force (AFRL telescope programs overseen by McCasland) · galaxy collision research · exoplanetary water detection.',
+        affiliation:'Caltech IPAC Science and Data Center · NASA JPL (collaborative) · USAF AFRL telescope programs',
+        ruling:'Homicide. Shot on his front porch at 6AM. Suspect arrested — a 29-year-old man who had previously been arrested for trespassing on Grillmair\'s property in December 2025. Authorities state they do not believe the suspect knew Grillmair.',
+        circumstances:'Shot at 6AM on front porch. Suspect had previously trespassed on his property — meaning physical reconnaissance of his home had occurred two months before. The killer had no apparent personal connection to Grillmair, per authorities. His work directly connected to McCasland-overseen AFRL telescope programs.',
+        warning:'None documented. However: the prior trespassing arrest by the same suspect indicates the property had been physically surveilled.',
+        overlap:'AFRL telescope program connection to McCasland. Planetary defense / near-Earth object work has direct dual-use military applications (incoming object detection = incoming missile/weapon detection). Prior trespass by suspect represents a potential surveillance-reconnaissance phase.',
+        tags:['caltech','nasa-jpl','missile-tracking','planetary-defense','homicide','prior-trespass','mccasland-afrl-link'],
+        flag:true, warned:false,
+        domain:['aerospace','intel'],
+      },
+      {
+        id:'C11', name:'Jason Thomas', role:'Pharmaceutical Researcher, Novartis — Cancer Treatment',
+        status:'dead', badge:'Deceased',
+        when:'Missing December 12, 2025 · Body found March 17, 2026 · Lake Quannapowitt, Massachusetts',
+        expertise:'Experimental cancer treatment research at Novartis.',
+        affiliation:'Novartis',
+        ruling:'No foul play suspected. Cause of death undetermined as of April 2026 — despite body having been recovered.',
+        circumstances:'Disappeared Dec 12. Wife reported him missing when he didn\'t return home. Body recovered from Massachusetts lake on March 17 — the lake had been frozen and inaccessible in prior months. Three-month gap between disappearance and discovery. Cause of death still undetermined.',
+        warning:'None documented.',
+        overlap:'Pharmaceutical domain rather than aerospace/nuclear. Weakest domain overlap with remainder of cluster. Connection to classified programs less established. Included in FBI review list but institutional fit is softest of all cases.',
+        tags:['pharmaceutical','novartis','cancer-research','lake-recovery','undetermined-cause'],
+        flag:false, warned:false,
+        domain:['intel'],
+      },
+    ]
+  }
+];
+
+function buildCard(c, eraIdx) {
+  const statusMap = { dead:'Deceased', missing:'Missing', underground:'Withdrew/Deceased' };
+  const warnBlock = (c.warned && c.warning && c.warning !== 'None documented.') ? `
+    <div class="row"><div class="row-lbl">Pre-Death / Pre-Disappearance Statements</div>
+    <div class="row-body">${c.warning}</div></div>` : '';
+  const flagBlock = c.flag ? `<div class="flag">${c.overlap}</div>` : '';
+  const overlapBlock = c.overlap && !c.flag ? `<div class="overlap-bar">${c.overlap}</div>` : '';
+  const tags = c.tags.map(t => {
+    const cl = (t.includes('uap')||t.includes('anti-grav')||t.includes('exotic')) ? 'v'
+             : (t.includes('nuclear')||t.includes('weapon')||t.includes('bomb')) ? 'r'
+             : (t.includes('nasa')||t.includes('jpl')||t.includes('afrl')||t.includes('aerospace')) ? 'gd'
+             : (t.includes('warn')||t.includes('contest')||t.includes('flag')||t.includes('cluster')||t.includes('on-foot')) ? 'a'
+             : 'g';
+    return `<span class="tag ${cl}">${t.replace(/-/g,' ')}</span>`;
+  }).join('');
+
+  return `<div class="card ${c.status}" 
+    data-status="${c.status}" 
+    data-domain="${c.domain.join(' ')}" 
+    data-flag="${c.flag}" 
+    data-warned="${c.warned}">
+    <div class="card-badge">${c.badge || statusMap[c.status]}</div>
+    <div class="card-idx">${c.id}</div>
+    <div class="card-name">${c.name}</div>
+    <div class="card-role">${c.role}</div>
+    <div class="card-when"><strong>${c.when}</strong></div>
+    <div class="row"><div class="row-lbl">Area of Expertise</div><div class="row-body">${c.expertise}</div></div>
+    <div class="row"><div class="row-lbl">Affiliation</div><div class="row-body">${c.affiliation}</div></div>
+    <div class="row"><div class="row-lbl">Official Ruling</div><div class="row-body">${c.ruling}</div></div>
+    <div class="row"><div class="row-lbl">Circumstances</div><div class="row-body">${c.circumstances}</div></div>
+    ${warnBlock}
+    ${flagBlock}${overlapBlock}
+    <div class="tags">${tags}</div>
+  </div>`;
+}
+
+function render() {
+  const main = document.getElementById('main');
+  let html = '';
+  eras.forEach((era, ei) => {
+    html += `<div class="era-block" id="${era.id}">
+      <div class="era-header ${era.cls}">
+        <div class="era-title">${era.label}</div>
+        <div class="era-sub">${era.sub}</div>
+      </div>
+      <div class="grid era-grid" id="grid-${era.id}">`;
+    era.cases.forEach(c => { html += buildCard(c, ei); });
+    html += `</div></div>`;
+  });
+  main.innerHTML = html;
+}
+
+function filter(type, btn) {
+  document.querySelectorAll('.fbtn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.card').forEach(card => {
+    let show = false;
+    const dom = card.dataset.domain || '';
+    if (type === 'all') show = true;
+    else if (type === 'dead') show = card.dataset.status === 'dead';
+    else if (type === 'missing') show = card.dataset.status === 'missing';
+    else if (type === 'nuclear') show = dom.includes('nuclear');
+    else if (type === 'aerospace') show = dom.includes('aerospace');
+    else if (type === 'exotic') show = dom.includes('exotic');
+    else if (type === 'intel') show = dom.includes('intel');
+    else if (type === 'flag') show = card.dataset.flag === 'true';
+    else if (type === 'warned') show = card.dataset.warned === 'true';
+    card.classList.toggle('h', !show);
+  });
+  // Hide empty era blocks
+  document.querySelectorAll('.era-block').forEach(block => {
+    const visible = block.querySelectorAll('.card:not(.h)').length > 0;
+    block.classList.toggle('h', !visible);
+  });
+}
+
+render();
+</script>
+</body>
+</html>
+
