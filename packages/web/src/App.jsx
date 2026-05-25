@@ -594,11 +594,11 @@ function tagVariant(type) {
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
-async function callClaude(model, system, prompt) {
+async function callClaude(model, system, prompt, maxTokens = 8192) {
   const resp = await fetch('/claude', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ system, prompt, model }),
+    body: JSON.stringify({ system, prompt, model, maxTokens }),
   })
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}))
@@ -771,6 +771,7 @@ export default function App() {
         EXTRACT_MODEL,
         SYS_EXPAND,
         `Investigation topic: ${topic}\n\nEntity map:\n${JSON.stringify(map, null, 2)}`,
+        2048,
       )
       if (abortRef.current) return
       const expand = safeJSON(rawExpand) || {}

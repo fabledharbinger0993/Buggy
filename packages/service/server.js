@@ -757,11 +757,11 @@ app.post("/congress/review", async (req, res) => {
 
 app.post("/claude", async (req, res) => {
   try {
-    const { system, prompt, model } = req.body || {};
+    const { system, prompt, model, maxTokens } = req.body || {};
     if (!prompt) return res.status(400).json({ ok: false, error: "prompt required" });
     const text = await callClaude(system || "", prompt, {
       model: model || EXTRACT_MODEL,
-      maxTokens: 4096,
+      maxTokens: Math.min(Number(maxTokens) || 8192, 8192),
     });
     res.json({ ok: true, text });
   } catch (err) {
