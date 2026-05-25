@@ -59,6 +59,9 @@ import {
   startSpan,
   traceAsync
 } from "./tracing.js";
+import { ExpansionEngine }    from "./expansionEngine.js";
+import { InvestigationGraph } from "./investigationGraph.js";
+import { processLead }        from "./spore.js";
 
 const PORT = parseInt(process.env.PORT || process.env.BUGGY_PORT || "5050", 10);
 const app = express();
@@ -768,6 +771,41 @@ app.post("/claude", async (req, res) => {
     console.error("[/claude]", err.message);
     res.status(500).json({ ok: false, error: err.message });
   }
+});
+
+// ─── Mycelium expansion (agentic investigation) ───────────────────────────────
+
+const activeInvestigations = new Map(); // jobId → { status, topic, graph }
+
+app.post("/investigate", (req, res) => {
+  const { topic, maxDepth = 2, maxBreadth = 30 } = req.body || {};
+  if (!topic?.trim()) return res.status(400).json({ ok: false, error: "topic required" });
+
+  const jobId = randomUUID();
+  const graph  = new InvestigationGraph();
+  const record = { status: "running", topic, graph, startedAt: Date.now() };
+  activeInvestigations.set(jobId, record);
+
+  res.json({ ok: true, jobId });
+
+  const engine = new ExpansionEngine({ maxDepth, maxBreadth });
+  engine.enqueue({ type: "entity", value: topic.trim(), depth: 0 });
+  engine
+    .expand((lead, eng) => processLead(lead, eng, { topic, graph, callClaude }))
+    .then(() => {
+      record.status = "complete";
+      record.completedAt = Date.now();
+    })
+    .catch((err) => {
+      record.status = "error";
+      record.error  = err.message;
+    });
+});
+
+app.get("/investigate/:id/graph", (req, res) => {
+  const record = activeInvestigations.get(req.params.id);
+  if (!record) return res.status(404).json({ error: "Investigation not found" });
+  res.json({ status: record.status, topic: record.topic, graph: record.graph.toJSON() });
 });
 
 // ─── Static web app (Railway production) ──────────────────────────────────────

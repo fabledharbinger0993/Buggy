@@ -20,6 +20,7 @@ export default defineConfig({
       '/vector-cluster':{ target: SERVICE, changeOrigin: true },
       '/resume-domain': { target: SERVICE, changeOrigin: true },
       '/congress':      { target: SERVICE, changeOrigin: true },
+      '/investigate':   { target: SERVICE, changeOrigin: true },
     },
   },
 })
