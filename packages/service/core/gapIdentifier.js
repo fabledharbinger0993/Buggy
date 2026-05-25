@@ -1,7 +1,7 @@
 // GAP IDENTIFIER MODULE
 // Identifies and names missing evidence or ambiguous areas.
 
-class Gap {
+export class Gap {
   constructor({ id, description, context, severity }) {
     this.id = id;
     this.description = description;
@@ -10,9 +10,9 @@ class Gap {
   }
 }
 
-function identifyGaps(evidenceList, context) {
+export function identifyGaps(evidenceList, context) {
   // Placeholder: In real use, analyze evidenceList and context for missing links
   return [];
 }
 
-module.exports = { Gap, identifyGaps };
+
