@@ -609,6 +609,16 @@ async function callClaude(model, system, prompt, maxTokens = 8192) {
   return data.text || ''
 }
 
+// Retries once if safeJSON parse fails — catches transient formatting errors
+async function callClaudeJSON(model, system, prompt, maxTokens = 8192) {
+  const raw = await callClaude(model, system, prompt, maxTokens)
+  const parsed = safeJSON(raw)
+  if (parsed) return parsed
+  // Retry once with an explicit reminder
+  const raw2 = await callClaude(model, system, prompt + '\n\nIMPORTANT: Your response must be valid JSON only. Begin with { and end with }.', maxTokens)
+  return safeJSON(raw2)
+}
+
 async function callBuggy(subject, sources) {
   try {
     const resp = await fetch('/search', {
@@ -755,26 +765,24 @@ export default function App() {
       setPhase('mapping')
       setStatusMsg('Casting spores — mapping the investigation space…')
 
-      const raw1 = await callClaude(
+      const map = await callClaudeJSON(
         EXTRACT_MODEL,
         SYS_MAP,
         `Investigation topic: ${topic}`,
       )
       if (abortRef.current) return
-      const map = safeJSON(raw1)
       if (!map) throw new Error('SPORE CAST returned unparseable JSON. Check that the Buggy service is running and the API key is configured.')
       setMapData(map)
 
       // ── Web Expansion: second-degree network trace ───────────────────────
       setStatusMsg('Extending the web — tracing second-degree connections…')
-      const rawExpand = await callClaude(
+      const expand = await callClaudeJSON(
         EXTRACT_MODEL,
         SYS_EXPAND,
         `Investigation topic: ${topic}\n\nEntity map:\n${JSON.stringify(map, null, 2)}`,
         2048,
-      )
+      ) || {}
       if (abortRef.current) return
-      const expand = safeJSON(rawExpand) || {}
 
       // ── Phase 2: MYCELIUM SPREAD ─────────────────────────────────────────
       setPhase('researching')
@@ -799,9 +807,8 @@ export default function App() {
         'Extract findings with confidence scores. Flag all inconsistencies.',
       ].filter(Boolean).join('\n')
 
-      const raw2 = await callClaude(EXTRACT_MODEL, SYS_RESEARCH, resPrompt)
+      const res = await callClaudeJSON(SYNTH_MODEL, SYS_RESEARCH, resPrompt)
       if (abortRef.current) return
-      const res = safeJSON(raw2)
       if (!res) throw new Error('MYCELIUM SPREAD returned unparseable JSON.')
       setResData(res)
 
@@ -822,9 +829,8 @@ export default function App() {
         'subplots, inconsistencies, and follow-up directives.',
       ].join('\n')
 
-      const raw3 = await callClaude(SYNTH_MODEL, SYS_SYNTH, synthPrompt)
+      const synth = await callClaudeJSON(SYNTH_MODEL, SYS_SYNTH, synthPrompt)
       if (abortRef.current) return
-      const synth = safeJSON(raw3)
       if (!synth) throw new Error('FRUITING BODY returned unparseable JSON.')
       setSynthData(synth)
 
