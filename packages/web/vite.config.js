@@ -21,6 +21,7 @@ export default defineConfig({
       '/resume-domain': { target: SERVICE, changeOrigin: true },
       '/congress':      { target: SERVICE, changeOrigin: true },
       '/investigate':   { target: SERVICE, changeOrigin: true },
+      '/memory':        { target: SERVICE, changeOrigin: true },
     },
   },
 })

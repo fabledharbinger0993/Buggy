@@ -619,6 +619,20 @@ async function callClaudeJSON(model, system, prompt, maxTokens = 8192) {
   return safeJSON(raw2)
 }
 
+async function fetchPriorIntelligence(topic) {
+  const [memR, neighborsR] = await Promise.allSettled([
+    fetch('/memory/query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: topic, top_k: 5, min_confidence: 0.4 }),
+    }).then(r => r.json()),
+    fetch(`/memory/neighbors?concept=${encodeURIComponent(topic)}&depth=2`).then(r => r.json()),
+  ])
+  const memories  = memR.status       === 'fulfilled' ? (memR.value?.results   || []) : []
+  const neighbors = neighborsR.status === 'fulfilled' ? (neighborsR.value?.neighbors || []) : []
+  return { memories, neighbors }
+}
+
 async function callBuggy(subject, sources) {
   try {
     const resp = await fetch('/search', {
@@ -763,12 +777,19 @@ export default function App() {
     // ── Phase 1: SPORE CAST ──────────────────────────────────────────────────
     try {
       setPhase('mapping')
+      setStatusMsg('Querying memory network for prior intelligence…')
+      const { memories, neighbors } = await fetchPriorIntelligence(topic)
+      const memCtx      = memories.map(r => r.content).join('\n')
+      const neighborCtx = neighbors.map(n => n.concept).join(', ')
+
       setStatusMsg('Casting spores — mapping the investigation space…')
 
       const map = await callClaudeJSON(
         EXTRACT_MODEL,
         SYS_MAP,
-        `Investigation topic: ${topic}`,
+        `Investigation topic: ${topic}` +
+        (memCtx      ? `\n\nPrior intelligence from memory:\n${memCtx}`                          : '') +
+        (neighborCtx ? `\n\nRelated concepts from prior investigations: ${neighborCtx}` : ''),
       )
       if (abortRef.current) return
       if (!map) throw new Error('SPORE CAST returned unparseable JSON. Check that the Buggy service is running and the API key is configured.')
@@ -833,6 +854,20 @@ export default function App() {
       if (abortRef.current) return
       if (!synth) throw new Error('FRUITING BODY returned unparseable JSON.')
       setSynthData(synth)
+
+      // Persist synthesis to the memory pool (fire-and-forget)
+      if (synth.summary) {
+        fetch('/memory/store', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content:    `[${topic}] ${synth.summary}`,
+            confidence: synth.confidence || 0.7,
+            source:     topic,
+            tags:       (synth.cast || []).map(c => c.name).slice(0, 10),
+          }),
+        }).catch(() => {})
+      }
 
       setPhase('done')
       setStatusMsg('Investigation complete.')

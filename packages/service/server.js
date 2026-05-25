@@ -62,8 +62,12 @@ import {
 import { ExpansionEngine }    from "./expansionEngine.js";
 import { InvestigationGraph } from "./investigationGraph.js";
 import { processLead }        from "./spore.js";
+import { queryMemory, storeMemory, graphNeighbors } from "./memoryClient.js";
 
 const PORT = parseInt(process.env.PORT || process.env.BUGGY_PORT || "5050", 10);
+if (!process.env.HOLOGRAIM_URL) {
+  console.warn("[memory] HOLOGRAIM_URL not set — memory features disabled");
+}
 const app = express();
 app.use(express.json());
 
@@ -440,6 +444,18 @@ async function ingestAndAnalyze(session, documents, subject, contextCue, setting
     setSpanAttribute(span, "claims.total", verified.entityGraph.claims.length);
     updateJob(session.id, "Complete", "complete");
     console.log(`[buggy] Search complete: ${subject} — ${documents.length} docs, ${verified.entityGraph.entities.length} entities`);
+
+    // Persist high-confidence entities to the memory pool (fire-and-forget)
+    const topEntities = (verified.entityGraph.entities || []).filter(e => Number(e.confidence ?? 1) >= 0.6);
+    for (const ent of topEntities) {
+      storeMemory({
+        content:    `[${ent.type || "entity"}] ${ent.name}${ent.notes ? ": " + ent.notes : ""}`,
+        confidence: Number(ent.confidence ?? 0.7),
+        source:     subject,
+        tags:       [ent.type, subject, ...(ent.aliases || [])].filter(Boolean),
+      });
+    }
+    if (topEntities.length) console.log(`[memory] stored ${topEntities.length} entities for "${subject}"`);
   }, { parentSpan, attributes: { "session.id": session.id, "session.subject": subject, "documents.count": documents.length } });
 }
 
@@ -754,6 +770,39 @@ app.post("/congress/review", async (req, res) => {
     const s = await getSettings();
     runSessionTribunal(sessionId, subject, { claimCount, entityCount, inconsistencyCount }, s).catch(() => {});
   } catch { /* silent */ }
+});
+
+// ─── Memory proxy (keeps HOLOGRAIM_URL server-side) ──────────────────────────
+
+app.post("/memory/query", async (req, res) => {
+  try {
+    const { query, top_k, min_confidence } = req.body || {};
+    const result = await queryMemory(query || "", top_k, min_confidence);
+    res.json(result || { results: [] });
+  } catch {
+    res.json({ results: [] });
+  }
+});
+
+app.post("/memory/store", async (req, res) => {
+  try {
+    const { content, confidence, source, tags } = req.body || {};
+    storeMemory({ content: content || "", confidence, source, tags });
+    res.json({ accepted: true });
+  } catch {
+    res.json({ accepted: false });
+  }
+});
+
+app.get("/memory/neighbors", async (req, res) => {
+  try {
+    const concept = req.query.concept || "";
+    const depth   = parseInt(req.query.depth || "2", 10);
+    const result  = await graphNeighbors(concept, depth);
+    res.json(result || { concept, neighbors: [] });
+  } catch {
+    res.json({ concept: req.query.concept || "", neighbors: [] });
+  }
 });
 
 // ─── Claude proxy (keeps API key server-side) ─────────────────────────────────
