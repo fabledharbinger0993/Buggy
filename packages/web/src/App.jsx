@@ -890,7 +890,7 @@ export default function App() {
             <div style={S.logoPlaceholder}>🍄</div>
           ) : (
             <img
-              src="/logo.jpeg"
+              src="/logo.png"
               alt="FungAI P.I."
               style={S.logo}
               onError={() => setLogoError(true)}
