@@ -6,5 +6,3 @@ export function inferConnections(evidenceList) {
   // Return array of { from, to, strength, rationale }
   return [];
 }
-
-export { inferConnections };

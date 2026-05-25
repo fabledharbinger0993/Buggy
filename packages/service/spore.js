@@ -49,7 +49,8 @@ export async function processLead(lead, engine, { topic, graph, callClaude }) {
       `Investigation topic: ${topic}\n\nLead [${type}]: ${value}`,
       { model: 'claude-haiku-4-5-20251001', maxTokens: 1024 },
     );
-  } catch {
+  } catch (err) {
+    console.error('[spore] callClaude failed', { topic, leadType: type, leadValue: value, error: err?.message });
     return { newLeads: [], result: null };
   }
 
@@ -73,7 +74,7 @@ export async function processLead(lead, engine, { topic, graph, callClaude }) {
     .filter(nl => nl?.value?.trim())
     .slice(0, MAX_NEW_LEADS)
     .map(nl => ({
-      type:        nl.type    || 'entity',
+      type:        nl.type    || 'org',
       value:       nl.value.trim(),
       rationale:   nl.rationale || '',
       parentValue: value,
