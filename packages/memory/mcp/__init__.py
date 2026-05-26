@@ -1,0 +1,1 @@
+# MCP memory lattice package marker
