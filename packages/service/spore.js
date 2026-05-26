@@ -39,14 +39,22 @@ function safeParseJSON(raw) {
 }
 
 // Bound into the engine via: engine.expand((lead, eng) => processLead(lead, eng, ctx))
-export async function processLead(lead, engine, { topic, graph, callClaude }) {
+export async function processLead(lead, engine, { topic, graph, callClaude, queryMemory }) {
   const { type, value, depth = 0 } = lead;
+
+  // Pull prior intelligence on this specific lead before calling Claude
+  let memCtx = '';
+  if (queryMemory) {
+    const prior = await queryMemory(value, 2, 0.5).catch(() => null);
+    memCtx = (prior?.results || []).map(r => r.content).join('\n').slice(0, 1500);
+  }
 
   let raw;
   try {
     raw = await callClaude(
       SYS_SPORE,
-      `Investigation topic: ${topic}\n\nLead [${type}]: ${value}`,
+      `Investigation topic: ${topic}\n\nLead [${type}]: ${value}` +
+      (memCtx ? `\n\nPrior intelligence on this lead:\n${memCtx}` : ''),
       { model: 'claude-haiku-4-5-20251001', maxTokens: 1024 },
     );
   } catch {

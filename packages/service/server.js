@@ -846,11 +846,31 @@ app.post("/investigate", (req, res) => {
 
   const engine = new ExpansionEngine({ maxDepth, maxBreadth });
   engine.enqueue({ type: "entity", value: topic.trim(), depth: 0 });
+
+  // Pre-seed from memory: prior neighbor concepts start at depth 1
+  graphNeighbors(topic, 1).then(mem => {
+    for (const n of (mem?.neighbors || []).filter(n => n.strength >= 0.4).slice(0, 5)) {
+      engine.enqueue({ type: "entity", value: n.concept, depth: 1 });
+    }
+  }).catch(() => {});
+
   engine
-    .expand((lead, eng) => processLead(lead, eng, { topic, graph, callClaude }))
+    .expand((lead, eng) => processLead(lead, eng, { topic, graph, callClaude, queryMemory }))
     .then(() => {
       record.status = "complete";
       record.completedAt = Date.now();
+
+      // Flush completed graph to memory pool (fire-and-forget)
+      const nodes = [...record.graph.nodes.values()].filter(n => n.relevance >= 0.6);
+      for (const node of nodes) {
+        storeMemory({
+          content:    `[${node.type}] ${node.id}${node.context ? ': ' + node.context : ''}`,
+          confidence: node.relevance,
+          source:     topic,
+          tags:       [node.type, topic, ...(node.connections || [])].filter(Boolean).slice(0, 15),
+        });
+      }
+      if (nodes.length) console.log(`[memory] stored ${nodes.length} nodes for "${topic}"`);
     })
     .catch((err) => {
       record.status = "error";
