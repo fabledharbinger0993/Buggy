@@ -22,27 +22,29 @@ class QueryReq(BaseModel):
 
 @app.get("/health")
 def health():
-    # No direct count, so just return ok
     return {"ok": True}
 
 
 @app.post("/memory/store")
 async def store_memory(body: StoreReq):
+    if not body.content.strip():
+        return {"accepted": False, "error": "empty content"}
     mem_id = str(uuid.uuid4())
     ok = add_to_holographic(mem_id, body.content)
-    # Optionally, you could also add to associative graph here for concept/tag linkage
     return {"accepted": ok, "id": mem_id}
 
 
 @app.post("/memory/query")
 async def query_memory(body: QueryReq):
-    # Only holographic query for now
+    if body.top_k <= 0:
+        return {"results": []}
     results = query_holographic(body.query, top_k=body.top_k)
+    if body.min_confidence > 0:
+        results = [r for r in results if r.get("confidence", 1.0) >= body.min_confidence]
     return {"results": results}
 
 
 @app.get("/memory/neighbors")
 async def graph_neighbors_endpoint(concept: str, depth: int = 2):
-    # Use associative graph for neighbor queries
     result = get_neighbors(concept, depth=depth)
     return result
