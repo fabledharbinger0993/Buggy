@@ -71,14 +71,26 @@ if (!process.env.HOLOGRAIM_URL) {
 const app = express();
 app.use(express.json());
 
-// CORS — allow browser-based clients (CARTOGRAPHER artifact, local extension)
+// Hardened CORS policy
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean);
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
+  const origin = req.headers.origin;
+  if (ALLOWED_ORIGINS.length && origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.header("Access-Control-Allow-Origin", origin);
+  }
   res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type");
+  res.header("Access-Control-Allow-Headers", "Content-Type, x-api-key");
   if (req.method === "OPTIONS") return res.sendStatus(200);
   next();
 });
+
+// API key middleware for sensitive endpoints
+function requireApiKey(req, res, next) {
+  if (req.headers["x-api-key"] !== process.env.INTERNAL_API_KEY) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  next();
+}
 
 // Active jobs: jobId → { status, progress, sessionId, traceId, updatedAt }
 const activeJobs = new Map();
@@ -176,7 +188,7 @@ app.get("/sessions/:id/export", async (req, res) => {
   }
 });
 
-app.post("/resume-domain", (req, res) => {
+app.post("/resume-domain", requireApiKey, (req, res) => {
   const { domain } = req.body || {};
   if (!domain) return res.status(400).json({ error: "domain required" });
   resumeDomain(domain);
@@ -575,17 +587,19 @@ async function summarizeDocument(settings, doc, subject, parentSpan) {
   if (!snippet) return "PDF or non-text content captured; parse in results panel.";
 
   const prompt = [
-    `Subject: ${subject}`, `Document URL: ${doc.url}`,
+    `Subject: ${subject}`,
+    `Document URL: ${doc.url}`,
     "Summarize this document in one sentence focused on subject relevance.",
-    `Return JSON only: {"summary":"string"}`, snippet
+    `Return JSON only: {"summary":"string"}`,
+    snippet
   ].join("\n\n");
 
   const raw = await callOllama(settings, "You summarize archival documents in concise JSON.", prompt, parentSpan, {
     operation: "document_summary", documentId: doc.id
   });
   try {
-const parsed = cleanJsonResponse(raw);
-        return parsed.summary || "Summary unavailable";
+    const parsed = cleanJsonResponse(raw);
+    return parsed.summary || "Summary unavailable";
   } catch {
     return "Summary unavailable";
   }
@@ -814,7 +828,7 @@ app.get("/memory/neighbors", async (req, res) => {
 
 // ─── Claude proxy (keeps API key server-side) ─────────────────────────────────
 
-app.post("/claude", async (req, res) => {
+app.post("/claude", requireApiKey, async (req, res) => {
   try {
     const { system, prompt, model, maxTokens } = req.body || {};
     if (!prompt) return res.status(400).json({ ok: false, error: "prompt required" });
@@ -827,6 +841,14 @@ app.post("/claude", async (req, res) => {
     console.error("[/claude]", err.message);
     res.status(500).json({ ok: false, error: err.message });
   }
+});
+
+// Secure /resume-domain endpoint
+app.post("/resume-domain", requireApiKey, (req, res) => {
+  const { domain } = req.body || {};
+  if (!domain) return res.status(400).json({ error: "domain required" });
+  resumeDomain(domain);
+  res.json({ resumed: true });
 });
 
 // ─── Mycelium expansion (agentic investigation) ───────────────────────────────
@@ -907,5 +929,9 @@ app.listen(PORT, () => {
 if (!process.env.ANTHROPIC_API_KEY) {
   console.error("[buggy-service] FATAL: ANTHROPIC_API_KEY env var is required.");
   console.error("[buggy-service] Set it in your .env file or deployment environment.");
+  process.exit(1);
+}
+if (!process.env.INTERNAL_API_KEY) {
+  console.error("[buggy-service] FATAL: INTERNAL_API_KEY env var is required for sensitive endpoints.");
   process.exit(1);
 }

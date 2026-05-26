@@ -99,10 +99,14 @@ export const OLLAMA_PROMPTS = {
 };
 
 export function cleanJsonResponse(raw) {
-  const trimmed = (raw || "").trim();
-  if (!trimmed) {
-    return {};
+  // Extract the first JSON object or array from the string, regardless of code fences or prose
+  const match = (raw || "").match(/({[\s\S]*?}|\[[\s\S]*?\])/);
+  if (!match) return {};
+  try {
+    return JSON.parse(match[0]);
+  } catch (e) {
+    // fallback: try to clean up common fence/whitespace issues
+    const noFence = (raw || "").replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
+    return JSON.parse(noFence);
   }
-  const noFence = trimmed.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
-  return JSON.parse(noFence);
 }
