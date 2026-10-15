@@ -265,7 +265,16 @@ export default function ConnectionsGraph({ mapData, resData, synthData, memoryDa
       .text(d => d.label.length > 18 ? d.label.slice(0, 16) + '…' : d.label)
 
     // ── Manual link: click two nodes to draw a thread ──────────────────────────
-    node.on('click', (e, d) => {
+    node.attr('tabindex', 0)
+      .attr('role', 'button')
+      .attr('aria-label', d => `Link node ${d.label}`)
+      .on('keydown', function(e) {
+        if (!linkModeRef.current || (e.key !== 'Enter' && e.key !== ' ')) return
+        e.preventDefault()
+        e.stopPropagation()
+        d3.select(this).dispatch('click')
+      })
+      .on('click', (e, d) => {
       if (!linkModeRef.current) return
       e.stopPropagation()
 
