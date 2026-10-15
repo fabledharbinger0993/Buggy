@@ -187,7 +187,8 @@ def fetch_with_policy(url: str, *, stream: bool = False, timeout: int = 30):
 
 def process_document(url: str, catalog: dict, is_search_hit: bool = False):
     """Stream-download, scan first N words, LLM-evaluate, catalog, keep if match."""
-    filename = url.split("/")[-1]
+    from hashlib import sha256
+    filename = f"{sha256(url.encode('utf-8')).hexdigest()}.pdf"
     local_path = DOWNLOAD_DIR / filename
 
     if url in catalog:
