@@ -862,7 +862,7 @@ export default function App() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             content:    `[${topic}] ${synth.summary}`,
-            confidence: synth.confidence || 0.7,
+            confidence: synth.confidence ?? 0.7,
             source:     topic,
             tags:       (synth.cast || []).map(c => c.name).slice(0, 10),
           }),
