@@ -137,7 +137,7 @@ export default function ConnectionsGraph({ mapData, resData, synthData, memoryDa
 
     const { nodes, links } = buildGraph(mapData, resData, synthData, memoryData)
     // Merge manual links added by the user; clone to avoid mutation issues
-    const liveLinkData = [...links, ...manualLinksRef.current]
+    const liveLinkData = [...links, ...manualLinksRef.current.map(link => ({ ...link }))]
     pendingRef.current = null
 
     el.innerHTML = ''
