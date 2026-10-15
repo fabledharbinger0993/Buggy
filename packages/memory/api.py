@@ -1,8 +1,8 @@
 import uuid
 from fastapi import FastAPI
 from pydantic import BaseModel
-from .mcp.holographic import add_to_holographic, query_holographic
-from .mcp.associative import get_neighbors
+from mcp.holographic import add_to_holographic, query_holographic
+from mcp.associative import get_neighbors
 
 app = FastAPI(title="FungAI Memory (MCP)")
 

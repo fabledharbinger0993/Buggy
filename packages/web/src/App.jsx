@@ -809,7 +809,8 @@ export default function App() {
         (neighborCtx ? `\n\nRelated concepts from prior investigations: ${neighborCtx}` : ''),
       )
       if (abortRef.current) return
-      if (!map) throw new Error('SPORE CAST returned unparseable JSON. Check that the Buggy service is running and the API key is configured.')
+      const map = safeJSON(raw1)
+      if (!map) throw new Error('SPORE CAST returned unparseable JSON. Please retry the investigation.')
       setMapData(map)
 
       // Store SPORE CAST entities + relationships to memory so future maps inherit the graph

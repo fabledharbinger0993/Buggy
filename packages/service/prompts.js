@@ -25,7 +25,7 @@ const INVESTIGATIVE_RIGOR_SYSTEM = [
   "You must surface and explore valid arguments and evidence outside the dominant narrative, and make explicit any assumptions, biases, or pre-approved narratives influencing the analysis.",
   "Actively seek out, document, and weigh dissenting or marginalized perspectives, not dismissing them due to lack of mainstream acceptance.",
   "Transparently log the weighting and treatment of all sources in the investigation record."
-.join(" "),]
+].join(" ");
 export const OLLAMA_PROMPTS = {
   entityExtraction: {
     system: [
