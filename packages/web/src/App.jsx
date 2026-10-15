@@ -754,6 +754,7 @@ export default function App() {
   const [mapData,      setMapData]      = useState(null)
   const [resData,      setResData]      = useState(null)
   const [synthData,    setSynthData]    = useState(null)
+  const [memoryData,   setMemoryData]   = useState(null)
   const [error,        setError]        = useState('')
   const [statusMsg,    setStatusMsg]    = useState('')
   const [activeTab,    setActiveTab]    = useState('map')
@@ -772,6 +773,7 @@ export default function App() {
     setMapData(null)
     setResData(null)
     setSynthData(null)
+    setMemoryData(null)
     setActiveTab('map')
 
     // ── Phase 1: SPORE CAST ──────────────────────────────────────────────────
@@ -792,8 +794,23 @@ export default function App() {
         (neighborCtx ? `\n\nRelated concepts from prior investigations: ${neighborCtx}` : ''),
       )
       if (abortRef.current) return
-      if (!map) throw new Error('SPORE CAST returned unparseable JSON. Check that the Buggy service is running and the API key is configured.')
+      const map = safeJSON(raw1)
+      if (!map) throw new Error('SPORE CAST returned unparseable JSON. Please retry the investigation.')
       setMapData(map)
+
+      // Store SPORE CAST entities + relationships to memory so future maps inherit the graph
+      for (const e of map.entities || []) {
+        fetch('/memory/store', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: `[${e.type || 'entity'}] ${e.name}${e.notes ? ': ' + e.notes : ''}`, confidence: 0.75, source: topic, tags: [e.type, topic].filter(Boolean) }),
+        }).catch(() => {})
+      }
+      for (const r of map.relationships || []) {
+        fetch('/memory/store', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: `[relation] ${r.from} — ${r.relation} → ${r.to}`, confidence: 0.8, source: topic, tags: [r.from, r.to, r.relation, topic].filter(Boolean) }),
+        }).catch(() => {})
+      }
 
       // ── Web Expansion: second-degree network trace ───────────────────────
       setStatusMsg('Extending the web — tracing second-degree connections…')
@@ -828,7 +845,7 @@ export default function App() {
         'Extract findings with confidence scores. Flag all inconsistencies.',
       ].filter(Boolean).join('\n')
 
-      const res = await callClaudeJSON(SYNTH_MODEL, SYS_RESEARCH, resPrompt)
+      const raw2 = await callClaude(EXTRACT_MODEL, SYS_RESEARCH, resPrompt)
       if (abortRef.current) return
       if (!res) throw new Error('MYCELIUM SPREAD returned unparseable JSON.')
       setResData(res)
@@ -887,6 +904,7 @@ export default function App() {
     setMapData(null)
     setResData(null)
     setSynthData(null)
+    setMemoryData(null)
     setError('')
     setStatusMsg('')
     setTopic('')
@@ -1183,12 +1201,13 @@ export default function App() {
                       </span>
                     </div>
                     <div style={{ fontSize: '11px', color: C.dim, marginBottom: '12px', fontFamily: '"Space Mono", monospace' }}>
-                      Drag nodes · scroll to zoom · solid lines = mapped relationships · dashed = co-occurrence
+                      Drag nodes · scroll to zoom · solid = mapped · dashed = co-occurrence · dim/dashed = recalled from memory
                     </div>
                     <ConnectionsGraph
                       mapData={mapData}
                       resData={resData}
                       synthData={synthData}
+                      memoryData={memoryData}
                     />
                   </div>
                 )}

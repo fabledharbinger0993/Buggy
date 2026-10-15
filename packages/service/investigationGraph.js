@@ -23,14 +23,14 @@ export class InvestigationGraph {
       n.connections = [...new Set([...n.connections, ...connections])];
       n.depth       = Math.min(n.depth, depth); // keep shallowest path
     } else {
-      this.nodes.set(key, { id: id.trim(), type, depth, context, relevance, connections });
+      this.nodes.set(key, { id: String(id).trim(), type, depth, context, relevance, connections });
     }
   }
 
   addEdge(from, to, strength, rationale) {
     const key = `${this._key(from)}→${this._key(to)}`;
     if (!this.edges.has(key)) {
-      this.edges.set(key, { from: from.trim(), to: to.trim(), strength, rationale });
+      this.edges.set(key, { from: String(from).trim(), to: String(to).trim(), strength, rationale });
     }
   }
 
