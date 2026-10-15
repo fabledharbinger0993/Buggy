@@ -639,8 +639,9 @@ async function fetchPriorIntelligence(topic) {
   }
 
   // Neighbor relationships → graph edges
-  const memEdges = neighbors.slice(0, 20).map(n => ({
-    from: topic, to: n.concept, relation: 'recalled', fromMemory: true,
+  const recalledEdges = neighborsR.status === 'fulfilled' ? (neighborsR.value?.edges || []) : []
+  const memEdges = recalledEdges.slice(0, 20).map(e => ({
+    from: e.source, to: e.target, relation: e.relationship, fromMemory: true,
   }))
 
   const memCtx      = memories.map(r => r.content).join('\n').slice(0, 2000)
