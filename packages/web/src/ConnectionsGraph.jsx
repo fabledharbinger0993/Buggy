@@ -68,7 +68,10 @@ function buildGraph(mapData, resData, synthData, memoryData) {
     addNode(e.to,   'entity', 0.5, true)
     if (s && t && s !== t) {
       const key = `${s}→${t}`
-      if (!linkSet.has(key)) {
+      const mapped = (mapData?.relationships || []).some(r =>
+        r.from?.trim().toLowerCase() === s && r.to?.trim().toLowerCase() === t
+      )
+      if (!mapped && !linkSet.has(key)) {
         linkSet.add(key)
         links.push({ source: s, target: t, label: e.relation || 'recalled', fromMemory: true })
       }
