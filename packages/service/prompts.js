@@ -25,7 +25,7 @@ const INVESTIGATIVE_RIGOR_SYSTEM = [
   "You must surface and explore valid arguments and evidence outside the dominant narrative, and make explicit any assumptions, biases, or pre-approved narratives influencing the analysis.",
   "Actively seek out, document, and weigh dissenting or marginalized perspectives, not dismissing them due to lack of mainstream acceptance.",
   "Transparently log the weighting and treatment of all sources in the investigation record."
-.join(" "),]
+].join(" ");
 export const OLLAMA_PROMPTS = {
   entityExtraction: {
     system: [
@@ -99,10 +99,14 @@ export const OLLAMA_PROMPTS = {
 };
 
 export function cleanJsonResponse(raw) {
-  const trimmed = (raw || "").trim();
-  if (!trimmed) {
-    return {};
+  // Extract the first JSON object or array from the string, regardless of code fences or prose
+  const match = (raw || "").match(/({[\s\S]*?}|\[[\s\S]*?\])/);
+  if (!match) return {};
+  try {
+    return JSON.parse(match[0]);
+  } catch (e) {
+    // fallback: try to clean up common fence/whitespace issues
+    const noFence = (raw || "").replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
+    return JSON.parse(noFence);
   }
-  const noFence = trimmed.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
-  return JSON.parse(noFence);
 }
