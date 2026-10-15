@@ -71,6 +71,7 @@ async def query_memory(body: QueryReq):
     results = _collection.query(
         query_texts=[body.query],
         n_results=min(max(1, body.top_k), count),
+        where={"confidence": {"$gte": body.min_confidence}},
         include=["documents", "metadatas", "distances"],
     )
     docs      = results["documents"][0] if results["documents"] else []
