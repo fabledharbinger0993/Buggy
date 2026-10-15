@@ -142,7 +142,16 @@ Respond in JSON only:
         # Strip markdown code fences regardless of case (```json, ```JSON, etc.)
         raw = re.sub(r"^```[a-zA-Z]*\s*", "", raw)
         raw = re.sub(r"\s*```$", "", raw)
-        return json.loads(raw.strip())
+        result = json.loads(raw.strip())
+        if (
+            not isinstance(result, dict)
+            or type(result.get("match")) is not bool
+            or type(result.get("confidence")) not in (int, float)
+            or not 0 <= result["confidence"] <= 100
+            or not isinstance(result.get("reasoning"), str)
+        ):
+            raise ValueError("Invalid LLM evaluation schema")
+        return result
     except Exception as e:
         return {"match": False, "confidence": 0, "reasoning": f"LLM error: {str(e)}"}
 
