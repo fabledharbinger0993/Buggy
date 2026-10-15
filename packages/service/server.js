@@ -843,67 +843,60 @@ app.post("/claude", requireApiKey, async (req, res) => {
   }
 });
 
-// Secure /resume-domain endpoint
-app.post("/resume-domain", requireApiKey, (req, res) => {
-  const { domain } = req.body || {};
-  if (!domain) return res.status(400).json({ error: "domain required" });
-  resumeDomain(domain);
-  res.json({ resumed: true });
-});
-
 // ─── Mycelium expansion (agentic investigation) ───────────────────────────────
 
-const activeInvestigations = new Map(); // jobId → { status, topic, graph }
+const activeInvestigations = new Map(); // jobId → { status, topic, graph, error? }
+
+// Evict completed/errored investigations older than 1 hour to prevent unbounded growth.
+setInterval(() => {
+  const cutoff = Date.now() - 60 * 60 * 1000;
+  for (const [id, rec] of activeInvestigations) {
+    if (rec.status !== "running" && (rec.completedAt || 0) < cutoff) {
+      activeInvestigations.delete(id);
+    }
+  }
+}, 15 * 60 * 1000).unref();
+
+const MAX_INVESTIGATION_DEPTH   = 5;
+const MAX_INVESTIGATION_BREADTH = 200;
 
 app.post("/investigate", (req, res) => {
-  const { topic, maxDepth = 2, maxBreadth = 30 } = req.body || {};
+  const { topic } = req.body || {};
   if (!topic?.trim()) return res.status(400).json({ ok: false, error: "topic required" });
+
+  const rawDepth   = req.body.maxDepth;
+  const rawBreadth = req.body.maxBreadth;
+  const maxDepth   = Math.min(Math.max(1, Math.floor(Number(rawDepth)   || 2)), MAX_INVESTIGATION_DEPTH);
+  const maxBreadth = Math.min(Math.max(1, Math.floor(Number(rawBreadth) || 30)), MAX_INVESTIGATION_BREADTH);
 
   const jobId = randomUUID();
   const graph  = new InvestigationGraph();
-  const record = { status: "running", topic, graph, startedAt: Date.now() };
+  const record = { status: "running", topic, graph, startedAt: Date.now(), error: null };
   activeInvestigations.set(jobId, record);
 
   res.json({ ok: true, jobId });
 
   const engine = new ExpansionEngine({ maxDepth, maxBreadth });
   engine.enqueue({ type: "entity", value: topic.trim(), depth: 0 });
-
-  // Pre-seed from memory: prior neighbor concepts start at depth 1
-  graphNeighbors(topic, 1).then(mem => {
-    for (const n of (mem?.neighbors || []).filter(n => n.strength >= 0.4).slice(0, 5)) {
-      engine.enqueue({ type: "entity", value: n.concept, depth: 1 });
-    }
-  }).catch(() => {});
-
   engine
-    .expand((lead, eng) => processLead(lead, eng, { topic, graph, callClaude, queryMemory }))
+    .expand((lead, eng) => processLead(lead, eng, { topic, graph, callClaude }))
     .then(() => {
       record.status = "complete";
       record.completedAt = Date.now();
-
-      // Flush completed graph to memory pool (fire-and-forget)
-      const nodes = [...record.graph.nodes.values()].filter(n => n.relevance >= 0.6);
-      for (const node of nodes) {
-        storeMemory({
-          content:    `[${node.type}] ${node.id}${node.context ? ': ' + node.context : ''}`,
-          confidence: node.relevance,
-          source:     topic,
-          tags:       [node.type, topic, ...(node.connections || [])].filter(Boolean).slice(0, 15),
-        });
-      }
-      if (nodes.length) console.log(`[memory] stored ${nodes.length} nodes for "${topic}"`);
     })
     .catch((err) => {
       record.status = "error";
-      record.error  = err.message;
+      record.error  = err?.message || String(err || "Unknown investigation error");
+      record.completedAt = Date.now();
     });
 });
 
 app.get("/investigate/:id/graph", (req, res) => {
   const record = activeInvestigations.get(req.params.id);
   if (!record) return res.status(404).json({ error: "Investigation not found" });
-  res.json({ status: record.status, topic: record.topic, graph: record.graph.toJSON() });
+  const payload = { status: record.status, topic: record.topic, graph: record.graph.toJSON() };
+  if (record.status === "error" && record.error) payload.error = record.error;
+  res.json(payload);
 });
 
 // ─── Static web app (Railway production) ──────────────────────────────────────
