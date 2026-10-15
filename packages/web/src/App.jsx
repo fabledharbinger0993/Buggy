@@ -619,6 +619,36 @@ async function callClaudeJSON(model, system, prompt, maxTokens = 8192) {
   return safeJSON(raw2)
 }
 
+async function fetchPriorIntelligence(topic) {
+  const [memR, neighborsR] = await Promise.allSettled([
+    fetch('/memory/query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: topic, top_k: 8, min_confidence: 0.4 }),
+    }).then(r => r.json()),
+    fetch(`/memory/neighbors?concept=${encodeURIComponent(topic)}&depth=2`).then(r => r.json()),
+  ])
+  const memories  = memR.status       === 'fulfilled' ? (memR.value?.results   || []) : []
+  const neighbors = neighborsR.status === 'fulfilled' ? (neighborsR.value?.neighbors || []) : []
+
+  // Parse stored nodes: "[type] name: context" → graph nodes
+  const memNodes = []
+  for (const r of memories) {
+    const m = r.content.match(/^\[([^\]]+)\]\s+([^:]+)/)
+    if (m) memNodes.push({ name: m[2].trim(), type: m[1].toLowerCase(), confidence: r.confidence, fromMemory: true })
+  }
+
+  // Neighbor relationships → graph edges
+  const memEdges = neighbors.slice(0, 20).map(n => ({
+    from: topic, to: n.concept, relation: 'recalled', fromMemory: true,
+  }))
+
+  const memCtx      = memories.map(r => r.content).join('\n').slice(0, 2000)
+  const neighborCtx = neighbors.slice(0, 20).map(n => n.concept).join(', ')
+
+  return { memories, neighbors, memNodes, memEdges, memCtx, neighborCtx }
+}
+
 async function callBuggy(subject, sources) {
   try {
     const resp = await fetch('/search', {
@@ -740,6 +770,7 @@ export default function App() {
   const [mapData,      setMapData]      = useState(null)
   const [resData,      setResData]      = useState(null)
   const [synthData,    setSynthData]    = useState(null)
+  const [memoryData,   setMemoryData]   = useState(null)
   const [error,        setError]        = useState('')
   const [statusMsg,    setStatusMsg]    = useState('')
   const [activeTab,    setActiveTab]    = useState('map')
@@ -758,21 +789,42 @@ export default function App() {
     setMapData(null)
     setResData(null)
     setSynthData(null)
+    setMemoryData(null)
     setActiveTab('map')
 
     // ── Phase 1: SPORE CAST ──────────────────────────────────────────────────
     try {
       setPhase('mapping')
+      setStatusMsg('Querying memory network for prior intelligence…')
+      const { memNodes, memEdges, memCtx, neighborCtx } = await fetchPriorIntelligence(topic)
+      setMemoryData({ nodes: memNodes, edges: memEdges })
+
       setStatusMsg('Casting spores — mapping the investigation space…')
 
       const map = await callClaudeJSON(
         EXTRACT_MODEL,
         SYS_MAP,
-        `Investigation topic: ${topic}`,
+        `Investigation topic: ${topic}` +
+        (memCtx      ? `\n\nPrior intelligence from memory:\n${memCtx}`                          : '') +
+        (neighborCtx ? `\n\nRelated concepts from prior investigations: ${neighborCtx}` : ''),
       )
       if (abortRef.current) return
       if (!map) throw new Error('SPORE CAST returned unparseable JSON. Check that the Buggy service is running and the API key is configured.')
       setMapData(map)
+
+      // Store SPORE CAST entities + relationships to memory so future maps inherit the graph
+      for (const e of map.entities || []) {
+        fetch('/memory/store', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: `[${e.type || 'entity'}] ${e.name}${e.notes ? ': ' + e.notes : ''}`, confidence: 0.75, source: topic, tags: [e.type, topic].filter(Boolean) }),
+        }).catch(() => {})
+      }
+      for (const r of map.relationships || []) {
+        fetch('/memory/store', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: `[relation] ${r.from} — ${r.relation} → ${r.to}`, confidence: 0.8, source: topic, tags: [r.from, r.to, r.relation, topic].filter(Boolean) }),
+        }).catch(() => {})
+      }
 
       // ── Web Expansion: second-degree network trace ───────────────────────
       setStatusMsg('Extending the web — tracing second-degree connections…')
@@ -834,6 +886,20 @@ export default function App() {
       if (!synth) throw new Error('FRUITING BODY returned unparseable JSON.')
       setSynthData(synth)
 
+      // Persist synthesis to the memory pool (fire-and-forget)
+      if (synth.summary) {
+        fetch('/memory/store', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content:    `[${topic}] ${synth.summary}`,
+            confidence: synth.confidence || 0.7,
+            source:     topic,
+            tags:       (synth.cast || []).map(c => c.name).slice(0, 10),
+          }),
+        }).catch(() => {})
+      }
+
       setPhase('done')
       setStatusMsg('Investigation complete.')
       setActiveTab('synth')
@@ -852,6 +918,7 @@ export default function App() {
     setMapData(null)
     setResData(null)
     setSynthData(null)
+    setMemoryData(null)
     setError('')
     setStatusMsg('')
     setTopic('')
@@ -1148,12 +1215,13 @@ export default function App() {
                       </span>
                     </div>
                     <div style={{ fontSize: '11px', color: C.dim, marginBottom: '12px', fontFamily: '"Space Mono", monospace' }}>
-                      Drag nodes · scroll to zoom · solid lines = mapped relationships · dashed = co-occurrence
+                      Drag nodes · scroll to zoom · solid = mapped · dashed = co-occurrence · dim/dashed = recalled from memory
                     </div>
                     <ConnectionsGraph
                       mapData={mapData}
                       resData={resData}
                       synthData={synthData}
+                      memoryData={memoryData}
                     />
                   </div>
                 )}
