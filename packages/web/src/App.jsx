@@ -630,7 +630,24 @@ async function fetchPriorIntelligence(topic) {
   ])
   const memories  = memR.status       === 'fulfilled' ? (memR.value?.results   || []) : []
   const neighbors = neighborsR.status === 'fulfilled' ? (neighborsR.value?.neighbors || []) : []
-  return { memories, neighbors }
+
+  // Parse stored nodes: "[type] name: context" → graph nodes
+  const memNodes = []
+  for (const r of memories) {
+    const m = typeof r.content === 'string' ? r.content.match(/^\[([^\]]+)\]\s+([^:]+)/) : null
+    if (m) memNodes.push({ name: m[2].trim(), type: m[1].toLowerCase(), confidence: r.confidence, fromMemory: true })
+  }
+
+  // Neighbor relationships → graph edges
+  const recalledEdges = neighborsR.status === 'fulfilled' ? (neighborsR.value?.edges || []) : []
+  const memEdges = recalledEdges.slice(0, 20).map(e => ({
+    from: e.source, to: e.target, relation: e.relationship, fromMemory: true,
+  }))
+
+  const memCtx      = memories.map(r => r.content).join('\n').slice(0, 2000)
+  const neighborCtx = neighbors.slice(0, 20).map(n => n.concept).join(', ')
+
+  return { memories, neighbors, memNodes, memEdges, memCtx, neighborCtx }
 }
 
 async function callBuggy(subject, sources) {
