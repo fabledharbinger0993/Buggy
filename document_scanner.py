@@ -167,6 +167,9 @@ def fetch_with_policy(url: str, *, stream: bool = False, timeout: int = 30):
 
     r = session.get(url, timeout=timeout, stream=stream)
 
+    if r.status_code >= 400:
+        r.close()
+
     if r.status_code == 429:
         print(f"429 Too Many Requests for {url} — backing off 60 s")
         time.sleep(60)
