@@ -236,12 +236,12 @@ def process_document(url: str, catalog: dict, is_search_hit: bool = False):
     if eval_result["match"] and eval_result["confidence"] >= MIN_CONFIDENCE:
         # Re-download full file (we only streamed partial bytes for scan)
         try:
+            time.sleep(CRAWL_DELAY)
             r_full = fetch_with_policy(url, timeout=60)
             with open(local_path, "wb") as f:
                 f.write(r_full.content)
             catalog[url]["full_downloaded"] = True
             print(f"KEPT (full download): {filename}")
-            time.sleep(CRAWL_DELAY)
         except Exception as e:
             print(f"Full download failed {filename}: {e}")
     else:
