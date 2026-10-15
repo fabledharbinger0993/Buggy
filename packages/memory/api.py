@@ -108,6 +108,8 @@ async def graph_neighbors(concept: str, depth: int = 2):
     neighbor_scores: dict[str, float] = {}
     for meta, dist in zip(metas, distances):
         similarity = max(0.0, 1.0 - float(dist))
+        if similarity <= 0.0:
+            continue
         tags = [t for t in meta.get("tags", "").split(",") if t]
         for tag in tags:
             if tag.lower() == concept.lower():
