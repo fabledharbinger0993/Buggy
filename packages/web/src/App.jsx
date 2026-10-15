@@ -726,7 +726,7 @@ export default function App() {
       )
       if (abortRef.current) return
       const map = safeJSON(raw1)
-      if (!map) throw new Error('SPORE CAST returned unparseable JSON. Check that the Buggy service is running and the API key is configured.')
+      if (!map) throw new Error('SPORE CAST returned unparseable JSON. Please retry the investigation.')
       setMapData(map)
 
       // ── Phase 2: MYCELIUM SPREAD ─────────────────────────────────────────
