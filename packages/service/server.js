@@ -62,19 +62,35 @@ import {
 import { ExpansionEngine }    from "./expansionEngine.js";
 import { InvestigationGraph } from "./investigationGraph.js";
 import { processLead }        from "./spore.js";
+import { queryMemory, storeMemory, graphNeighbors } from "./memoryClient.js";
 
 const PORT = parseInt(process.env.PORT || process.env.BUGGY_PORT || "5050", 10);
+if (!process.env.HOLOGRAIM_URL) {
+  console.warn("[memory] HOLOGRAIM_URL not set — memory features disabled");
+}
 const app = express();
 app.use(express.json());
 
-// CORS — allow browser-based clients (CARTOGRAPHER artifact, local extension)
+// Hardened CORS policy
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean);
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
+  const origin = req.headers.origin;
+  if (ALLOWED_ORIGINS.length && origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.header("Access-Control-Allow-Origin", origin);
+  }
   res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type");
+  res.header("Access-Control-Allow-Headers", "Content-Type, x-api-key");
   if (req.method === "OPTIONS") return res.sendStatus(200);
   next();
 });
+
+// API key middleware for sensitive endpoints
+function requireApiKey(req, res, next) {
+  if (req.headers["x-api-key"] !== process.env.INTERNAL_API_KEY) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  next();
+}
 
 // Active jobs: jobId → { status, progress, sessionId, traceId, updatedAt }
 const activeJobs = new Map();
@@ -172,7 +188,7 @@ app.get("/sessions/:id/export", async (req, res) => {
   }
 });
 
-app.post("/resume-domain", (req, res) => {
+app.post("/resume-domain", requireApiKey, (req, res) => {
   const { domain } = req.body || {};
   if (!domain) return res.status(400).json({ error: "domain required" });
   resumeDomain(domain);
@@ -440,6 +456,18 @@ async function ingestAndAnalyze(session, documents, subject, contextCue, setting
     setSpanAttribute(span, "claims.total", verified.entityGraph.claims.length);
     updateJob(session.id, "Complete", "complete");
     console.log(`[buggy] Search complete: ${subject} — ${documents.length} docs, ${verified.entityGraph.entities.length} entities`);
+
+    // Persist high-confidence entities to the memory pool (fire-and-forget)
+    const topEntities = (verified.entityGraph.entities || []).filter(e => Number(e.confidence ?? 1) >= 0.6);
+    for (const ent of topEntities) {
+      storeMemory({
+        content:    `[${ent.type || "entity"}] ${ent.name}${ent.notes ? ": " + ent.notes : ""}`,
+        confidence: Number(ent.confidence ?? 0.7),
+        source:     subject,
+        tags:       [ent.type, subject, ...(ent.aliases || [])].filter(Boolean),
+      });
+    }
+    if (topEntities.length) console.log(`[memory] stored ${topEntities.length} entities for "${subject}"`);
   }, { parentSpan, attributes: { "session.id": session.id, "session.subject": subject, "documents.count": documents.length } });
 }
 
@@ -559,17 +587,19 @@ async function summarizeDocument(settings, doc, subject, parentSpan) {
   if (!snippet) return "PDF or non-text content captured; parse in results panel.";
 
   const prompt = [
-    `Subject: ${subject}`, `Document URL: ${doc.url}`,
+    `Subject: ${subject}`,
+    `Document URL: ${doc.url}`,
     "Summarize this document in one sentence focused on subject relevance.",
-    `Return JSON only: {"summary":"string"}`, snippet
+    `Return JSON only: {"summary":"string"}`,
+    snippet
   ].join("\n\n");
 
   const raw = await callOllama(settings, "You summarize archival documents in concise JSON.", prompt, parentSpan, {
     operation: "document_summary", documentId: doc.id
   });
   try {
-const parsed = cleanJsonResponse(raw);
-        return parsed.summary || "Summary unavailable";
+    const parsed = cleanJsonResponse(raw);
+    return parsed.summary || "Summary unavailable";
   } catch {
     return "Summary unavailable";
   }
@@ -756,9 +786,49 @@ app.post("/congress/review", async (req, res) => {
   } catch { /* silent */ }
 });
 
+// ─── Memory proxy (keeps HOLOGRAIM_URL server-side) ──────────────────────────
+
+app.post("/memory/query", async (req, res) => {
+  try {
+    const { query, top_k, min_confidence } = req.body || {};
+    const result = await queryMemory(query || "", top_k, min_confidence);
+    res.json(result || { results: [] });
+  } catch {
+    res.json({ results: [] });
+  }
+});
+
+app.post("/memory/store", async (req, res) => {
+  const BASE = process.env.HOLOGRAIM_URL;
+  if (!BASE) return res.status(503).json({ accepted: false, disabled: true });
+  const { content, confidence, source, tags } = req.body || {};
+  try {
+    const r = await fetch(`${BASE}/memory/store`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content, confidence, source, tags }),
+      signal: AbortSignal.timeout(5000),
+    });
+    res.status(r.status).json(await r.json().catch(() => ({ accepted: false })));
+  } catch {
+    res.status(502).json({ accepted: false });
+  }
+});
+
+app.get("/memory/neighbors", async (req, res) => {
+  try {
+    const concept = req.query.concept || "";
+    const depth   = parseInt(req.query.depth || "2", 10);
+    const result  = await graphNeighbors(concept, depth);
+    res.json(result || { concept, neighbors: [] });
+  } catch {
+    res.json({ concept: req.query.concept || "", neighbors: [] });
+  }
+});
+
 // ─── Claude proxy (keeps API key server-side) ─────────────────────────────────
 
-app.post("/claude", async (req, res) => {
+app.post("/claude", requireApiKey, async (req, res) => {
   try {
     const { system, prompt, model, maxTokens } = req.body || {};
     if (!prompt) return res.status(400).json({ ok: false, error: "prompt required" });
@@ -775,15 +845,33 @@ app.post("/claude", async (req, res) => {
 
 // ─── Mycelium expansion (agentic investigation) ───────────────────────────────
 
-const activeInvestigations = new Map(); // jobId → { status, topic, graph }
+const activeInvestigations = new Map(); // jobId → { status, topic, graph, error? }
+
+// Evict completed/errored investigations older than 1 hour to prevent unbounded growth.
+setInterval(() => {
+  const cutoff = Date.now() - 60 * 60 * 1000;
+  for (const [id, rec] of activeInvestigations) {
+    if (rec.status !== "running" && (rec.completedAt || 0) < cutoff) {
+      activeInvestigations.delete(id);
+    }
+  }
+}, 15 * 60 * 1000).unref();
+
+const MAX_INVESTIGATION_DEPTH   = 5;
+const MAX_INVESTIGATION_BREADTH = 200;
 
 app.post("/investigate", (req, res) => {
-  const { topic, maxDepth = 2, maxBreadth = 30 } = req.body || {};
+  const { topic } = req.body || {};
   if (!topic?.trim()) return res.status(400).json({ ok: false, error: "topic required" });
+
+  const rawDepth   = req.body.maxDepth;
+  const rawBreadth = req.body.maxBreadth;
+  const maxDepth   = Math.min(Math.max(1, Math.floor(Number(rawDepth)   || 2)), MAX_INVESTIGATION_DEPTH);
+  const maxBreadth = Math.min(Math.max(1, Math.floor(Number(rawBreadth) || 30)), MAX_INVESTIGATION_BREADTH);
 
   const jobId = randomUUID();
   const graph  = new InvestigationGraph();
-  const record = { status: "running", topic, graph, startedAt: Date.now() };
+  const record = { status: "running", topic, graph, startedAt: Date.now(), error: null };
   activeInvestigations.set(jobId, record);
 
   res.json({ ok: true, jobId });
@@ -798,14 +886,17 @@ app.post("/investigate", (req, res) => {
     })
     .catch((err) => {
       record.status = "error";
-      record.error  = err.message;
+      record.error  = err?.message || String(err || "Unknown investigation error");
+      record.completedAt = Date.now();
     });
 });
 
 app.get("/investigate/:id/graph", (req, res) => {
   const record = activeInvestigations.get(req.params.id);
   if (!record) return res.status(404).json({ error: "Investigation not found" });
-  res.json({ status: record.status, topic: record.topic, graph: record.graph.toJSON() });
+  const payload = { status: record.status, topic: record.topic, graph: record.graph.toJSON() };
+  if (record.status === "error" && record.error) payload.error = record.error;
+  res.json(payload);
 });
 
 // ─── Static web app (Railway production) ──────────────────────────────────────
@@ -831,5 +922,9 @@ app.listen(PORT, () => {
 if (!process.env.ANTHROPIC_API_KEY) {
   console.error("[buggy-service] FATAL: ANTHROPIC_API_KEY env var is required.");
   console.error("[buggy-service] Set it in your .env file or deployment environment.");
+  process.exit(1);
+}
+if (!process.env.INTERNAL_API_KEY) {
+  console.error("[buggy-service] FATAL: INTERNAL_API_KEY env var is required for sensitive endpoints.");
   process.exit(1);
 }
