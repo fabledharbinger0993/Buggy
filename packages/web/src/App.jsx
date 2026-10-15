@@ -860,7 +860,7 @@ export default function App() {
         'Extract findings with confidence scores. Flag all inconsistencies.',
       ].filter(Boolean).join('\n')
 
-      const raw2 = await callClaude(EXTRACT_MODEL, SYS_RESEARCH, resPrompt)
+      const res = await callClaudeJSON(EXTRACT_MODEL, SYS_RESEARCH, resPrompt)
       if (abortRef.current) return
       if (!res) throw new Error('MYCELIUM SPREAD returned unparseable JSON.')
       setResData(res)
