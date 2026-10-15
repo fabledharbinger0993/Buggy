@@ -634,7 +634,7 @@ async function fetchPriorIntelligence(topic) {
   // Parse stored nodes: "[type] name: context" → graph nodes
   const memNodes = []
   for (const r of memories) {
-    const m = r.content.match(/^\[([^\]]+)\]\s+([^:]+)/)
+    const m = typeof r.content === 'string' ? r.content.match(/^\[([^\]]+)\]\s+([^:]+)/) : null
     if (m) memNodes.push({ name: m[2].trim(), type: m[1].toLowerCase(), confidence: r.confidence, fromMemory: true })
   }
 
