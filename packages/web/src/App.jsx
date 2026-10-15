@@ -624,7 +624,7 @@ async function fetchPriorIntelligence(topic) {
     fetch('/memory/query', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: topic, top_k: 8, min_confidence: 0.4 }),
+      body: JSON.stringify({ query: topic, top_k: 5, min_confidence: 0.4 }),
     }).then(r => r.json()),
     fetch(`/memory/neighbors?concept=${encodeURIComponent(topic)}&depth=2`).then(r => r.json()),
   ])
@@ -797,8 +797,9 @@ export default function App() {
     try {
       setPhase('mapping')
       setStatusMsg('Querying memory network for prior intelligence…')
-      const { memNodes, memEdges, memCtx, neighborCtx } = await fetchPriorIntelligence(topic)
-      setMemoryData({ nodes: memNodes, edges: memEdges })
+      const { memories, neighbors } = await fetchPriorIntelligence(topic)
+      const memCtx      = memories.map(r => r.content).join('\n')
+      const neighborCtx = neighbors.map(n => n.concept).join(', ')
 
       setStatusMsg('Casting spores — mapping the investigation space…')
 
@@ -861,7 +862,7 @@ export default function App() {
         'Extract findings with confidence scores. Flag all inconsistencies.',
       ].filter(Boolean).join('\n')
 
-      const raw2 = await callClaude(EXTRACT_MODEL, SYS_RESEARCH, resPrompt)
+      const res = await callClaudeJSON(EXTRACT_MODEL, SYS_RESEARCH, resPrompt)
       if (abortRef.current) return
       if (!res) throw new Error('MYCELIUM SPREAD returned unparseable JSON.')
       setResData(res)
@@ -895,7 +896,7 @@ export default function App() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             content:    `[${topic}] ${synth.summary}`,
-            confidence: synth.confidence || 0.7,
+            confidence: synth.confidence ?? 0.7,
             source:     topic,
             tags:       (synth.cast || []).map(c => c.name).slice(0, 10),
           }),

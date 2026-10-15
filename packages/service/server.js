@@ -799,19 +799,12 @@ app.post("/memory/query", async (req, res) => {
 });
 
 app.post("/memory/store", async (req, res) => {
-  const BASE = process.env.HOLOGRAIM_URL;
-  if (!BASE) return res.status(503).json({ accepted: false, disabled: true });
-  const { content, confidence, source, tags } = req.body || {};
   try {
-    const r = await fetch(`${BASE}/memory/store`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content, confidence, source, tags }),
-      signal: AbortSignal.timeout(5000),
-    });
-    res.status(r.status).json(await r.json().catch(() => ({ accepted: false })));
+    const { content, confidence, source, tags } = req.body || {};
+    storeMemory({ content: content || "", confidence, source, tags });
+    res.json({ accepted: true });
   } catch {
-    res.status(502).json({ accepted: false });
+    res.json({ accepted: false });
   }
 });
 

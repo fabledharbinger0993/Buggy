@@ -1,0 +1,310 @@
+/* popup.css — ArchiveLens extension popup styles */
+
+/* ── Reset & base ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #1a1d23;
+  --bg2: #22262e;
+  --bg3: #2c3040;
+  --accent: #4f9cf9;
+  --accent2: #6fcf97;
+  --warn: #f2994a;
+  --danger: #eb5757;
+  --text: #e4e8f0;
+  --text2: #8b95a8;
+  --border: #3a3f4e;
+  --radius: 6px;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+body {
+  width: 360px;
+  min-height: 200px;
+  font-family: var(--font);
+  font-size: 13px;
+  background: var(--bg);
+  color: var(--text);
+  user-select: none;
+}
+
+/* ── Header ───────────────────────────────────────────────────────────────── */
+.al-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+}
+
+.al-logo {
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+}
+
+.al-header-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.al-header-actions button {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 2px 4px;
+  border-radius: var(--radius);
+  color: var(--text2);
+  transition: background 0.15s;
+}
+.al-header-actions button:hover { background: var(--bg3); }
+
+/* ── Tabs ─────────────────────────────────────────────────────────────────── */
+.al-tabs {
+  display: flex;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+}
+
+.al-tab {
+  flex: 1;
+  padding: 8px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text2);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.al-tab.active,
+.al-tab:hover {
+  color: var(--accent);
+}
+
+.al-tab.active {
+  border-bottom-color: var(--accent);
+}
+
+/* ── Panels ───────────────────────────────────────────────────────────────── */
+.al-panel {
+  display: none;
+  padding: 12px 14px;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.al-panel.active {
+  display: flex;
+}
+
+/* ── Form fields ──────────────────────────────────────────────────────────── */
+.al-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.al-field label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.al-field-inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.al-field-inline label { text-transform: none; font-size: 12px; font-weight: 500; flex: 1; }
+
+.al-hint {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text2);
+}
+
+input[type="text"],
+input[type="number"],
+input[type="email"],
+textarea {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  padding: 6px 8px;
+  outline: none;
+  transition: border-color 0.15s;
+  resize: vertical;
+}
+
+input:focus, textarea:focus {
+  border-color: var(--accent);
+}
+
+/* ── Archive list ─────────────────────────────────────────────────────────── */
+.al-archive-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 100px;
+  overflow-y: auto;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+}
+
+.al-archive-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.al-archive-item input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
+.al-archive-item label {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+
+.al-loading-text {
+  font-size: 12px;
+  color: var(--text2);
+  font-style: italic;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────────── */
+.al-btn {
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 14px;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.al-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.al-btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+.al-btn-primary:hover:not(:disabled) { background: #3b87e8; }
+
+.al-btn-secondary {
+  background: var(--bg3);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.al-btn-secondary:hover:not(:disabled) { background: var(--border); }
+
+.al-btn-full { width: 100%; }
+
+.al-btn-small {
+  font-size: 11px;
+  padding: 3px 8px;
+  background: var(--accent);
+  color: #fff;
+}
+
+/* ── Status / progress ────────────────────────────────────────────────────── */
+.al-status {
+  padding: 8px 14px;
+  background: var(--bg2);
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.al-progress-bar {
+  height: 3px;
+  background: var(--bg3);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.al-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  width: 0%;
+  transition: width 0.3s;
+  animation: progress-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes progress-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+#al-status-text {
+  font-size: 11px;
+  color: var(--text2);
+}
+
+/* ── Warnings ─────────────────────────────────────────────────────────────── */
+.al-warning {
+  margin: 8px 14px;
+  padding: 8px 10px;
+  background: rgba(242, 153, 74, 0.15);
+  border: 1px solid var(--warn);
+  border-radius: var(--radius);
+  font-size: 12px;
+  color: var(--warn);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ── Info box ─────────────────────────────────────────────────────────────── */
+.al-info {
+  font-size: 12px;
+  color: var(--text2);
+  background: var(--bg3);
+  border-radius: var(--radius);
+  padding: 8px;
+}
+
+.al-url-preview {
+  font-size: 11px;
+  color: var(--accent);
+  font-family: monospace;
+  word-break: break-all;
+  background: var(--bg3);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+}
+
+/* ── Footer ───────────────────────────────────────────────────────────────── */
+.al-footer {
+  padding: 8px 14px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg2);
+}
+
+/* ── Utility ──────────────────────────────────────────────────────────────── */
+.hidden { display: none !important; }
