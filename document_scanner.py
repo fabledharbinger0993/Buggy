@@ -28,11 +28,7 @@ DOWNLOAD_DIR = Path.home() / "CIA_Declassified"  # cross-platform default
 WORDS_TO_SCAN = 400
 MIN_CONFIDENCE = 60
 CRAWL_DELAY = 10.0
-USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36 "
-    "PersonalResearchBot/1.0 (+https://yourdomain.com)"
-)
+USER_AGENT = "PersonalResearchBot/1.0 (+https://yourdomain.com)"
 
 ENABLE_OCR = False
 STREAM_SCAN_BYTES = 524_288  # 512 KB — enough for 400-word scan in most PDFs
