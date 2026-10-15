@@ -26,14 +26,14 @@ const SYS_MAP = `You are FUNGA.I., an adaptive investigative intelligence system
 Your role is to map the investigation space for the given topic.
 
 Analyse what you know and extract: key entities (people, organisations, events, \
-documents, locations), known relationships, timeline anchors, and the best archive \
-search vectors.
+documents, locations, government bodies, programs, financial nodes, media assets), \
+known relationships, timeline anchors, and the best archive search vectors.
 
 Return ONLY valid JSON — no markdown, no explanation, no code fences:
 {
   "subject": "string",
   "entities": [
-    { "name": "string", "type": "person|org|event|document|location", "notes": "string" }
+    { "name": "string", "type": "person|org|event|document|location|government_body|program|financial|media", "notes": "string" }
   ],
   "relationships": [
     { "from": "string", "to": "string", "relation": "string" }
@@ -45,9 +45,38 @@ Return ONLY valid JSON — no markdown, no explanation, no code fences:
   "archiveSources": ["blackvault","ciaCrest","wikileaks","nsarchive","internetArchive"]
 }`
 
+const SYS_EXPAND = `You are FUNGA.I. extending an investigation network. Given an \
+initial entity map, identify the second-degree connections that are structurally \
+implied but not yet named — adjacent government bodies, intelligence programs, \
+financial nodes, media assets, institutional affiliations, predecessor and successor \
+operations, cross-network patterns.
+
+Think in systems: who funds this, who oversees it, who benefits, what preceded it, \
+what ran in parallel, what was suppressed and by whom. Follow the money, the \
+jurisdiction, and the timeline.
+
+Return ONLY valid JSON — no markdown, no explanation, no code fences, no preamble. \
+Your response must begin with '{' and end with '}'.
+{
+  "expandedEntities": [
+    {
+      "name": "string",
+      "type": "government_body|program|financial|media|person|org|network",
+      "connection": "string (which known entity links here and how)",
+      "priority": "high|medium|low"
+    }
+  ],
+  "systemicPatterns": ["string (cross-cutting structural patterns)"],
+  "suggestedThreads": ["string (specific investigation threads to pursue)"]
+}`
+
 const SYS_RESEARCH = `You are FUNGA.I. conducting deep investigative research. You have \
-been provided an entity map from the SPORE CAST phase and, where available, archive \
-document excerpts.
+been provided an entity map, a second-degree network expansion, and where available, \
+archive document excerpts.
+
+For each entity — primary and expanded — trace one level outward: who funded it, \
+who oversaw it, what preceded or followed it, what parallel programs or operations \
+existed, and what institutional affiliations connect it to broader power structures.
 
 Analyse all evidence. Extract claims with confidence scores (0.0–1.0). Identify \
 corroborated patterns. Flag inconsistencies and evidence gaps.
@@ -84,7 +113,8 @@ const SYS_SYNTH = `You are FUNGA.I. synthesizing a completed investigation. \
 Using the entity map and research findings provided, produce a comprehensive, \
 sourced intelligence brief.
 
-Return ONLY valid JSON — no markdown, no explanation, no code fences:
+Return ONLY valid JSON — no markdown, no explanation, no code fences, no preamble. \
+Your response must begin with '{' and end with '}'. Nothing before or after the JSON object.
 {
   "subject": "string",
   "summary": "string",
@@ -527,7 +557,13 @@ function safeJSON(raw) {
     .replace(/^```\s*/i, '')
     .replace(/```\s*$/i, '')
     .trim()
-  try { return JSON.parse(cleaned) } catch { return null }
+  try { return JSON.parse(cleaned) } catch { /* fall through */ }
+  // Extract outermost {...} block in case Claude added preamble/postamble text
+  const match = cleaned.match(/\{[\s\S]*\}/)
+  if (match) {
+    try { return JSON.parse(match[0]) } catch { /* fall through */ }
+  }
+  return null
 }
 
 function confColor(c) {
@@ -558,11 +594,11 @@ function tagVariant(type) {
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
-async function callClaude(model, system, prompt) {
+async function callClaude(model, system, prompt, maxTokens = 8192) {
   const resp = await fetch('/claude', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ system, prompt, model }),
+    body: JSON.stringify({ system, prompt, model, maxTokens }),
   })
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}))
@@ -571,6 +607,46 @@ async function callClaude(model, system, prompt) {
   const data = await resp.json()
   if (!data.ok) throw new Error(data.error || 'Claude proxy error')
   return data.text || ''
+}
+
+// Retries once if safeJSON parse fails — catches transient formatting errors
+async function callClaudeJSON(model, system, prompt, maxTokens = 8192) {
+  const raw = await callClaude(model, system, prompt, maxTokens)
+  const parsed = safeJSON(raw)
+  if (parsed) return parsed
+  // Retry once with an explicit reminder
+  const raw2 = await callClaude(model, system, prompt + '\n\nIMPORTANT: Your response must be valid JSON only. Begin with { and end with }.', maxTokens)
+  return safeJSON(raw2)
+}
+
+async function fetchPriorIntelligence(topic) {
+  const [memR, neighborsR] = await Promise.allSettled([
+    fetch('/memory/query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: topic, top_k: 8, min_confidence: 0.4 }),
+    }).then(r => r.json()),
+    fetch(`/memory/neighbors?concept=${encodeURIComponent(topic)}&depth=2`).then(r => r.json()),
+  ])
+  const memories  = memR.status       === 'fulfilled' ? (memR.value?.results   || []) : []
+  const neighbors = neighborsR.status === 'fulfilled' ? (neighborsR.value?.neighbors || []) : []
+
+  // Parse stored nodes: "[type] name: context" → graph nodes
+  const memNodes = []
+  for (const r of memories) {
+    const m = r.content.match(/^\[([^\]]+)\]\s+([^:]+)/)
+    if (m) memNodes.push({ name: m[2].trim(), type: m[1].toLowerCase(), confidence: r.confidence, fromMemory: true })
+  }
+
+  // Neighbor relationships → graph edges
+  const memEdges = neighbors.slice(0, 20).map(n => ({
+    from: topic, to: n.concept, relation: 'recalled', fromMemory: true,
+  }))
+
+  const memCtx      = memories.map(r => r.content).join('\n').slice(0, 2000)
+  const neighborCtx = neighbors.slice(0, 20).map(n => n.concept).join(', ')
+
+  return { memories, neighbors, memNodes, memEdges, memCtx, neighborCtx }
 }
 
 async function callBuggy(subject, sources) {
@@ -694,6 +770,7 @@ export default function App() {
   const [mapData,      setMapData]      = useState(null)
   const [resData,      setResData]      = useState(null)
   const [synthData,    setSynthData]    = useState(null)
+  const [memoryData,   setMemoryData]   = useState(null)
   const [error,        setError]        = useState('')
   const [statusMsg,    setStatusMsg]    = useState('')
   const [activeTab,    setActiveTab]    = useState('map')
@@ -712,29 +789,59 @@ export default function App() {
     setMapData(null)
     setResData(null)
     setSynthData(null)
+    setMemoryData(null)
     setActiveTab('map')
 
     // ── Phase 1: SPORE CAST ──────────────────────────────────────────────────
     try {
       setPhase('mapping')
+      setStatusMsg('Querying memory network for prior intelligence…')
+      const { memNodes, memEdges, memCtx, neighborCtx } = await fetchPriorIntelligence(topic)
+      setMemoryData({ nodes: memNodes, edges: memEdges })
+
       setStatusMsg('Casting spores — mapping the investigation space…')
 
-      const raw1 = await callClaude(
+      const map = await callClaudeJSON(
         EXTRACT_MODEL,
         SYS_MAP,
-        `Investigation topic: ${topic}`,
+        `Investigation topic: ${topic}` +
+        (memCtx      ? `\n\nPrior intelligence from memory:\n${memCtx}`                          : '') +
+        (neighborCtx ? `\n\nRelated concepts from prior investigations: ${neighborCtx}` : ''),
       )
       if (abortRef.current) return
       const map = safeJSON(raw1)
       if (!map) throw new Error('SPORE CAST returned unparseable JSON. Please retry the investigation.')
       setMapData(map)
 
+      // Store SPORE CAST entities + relationships to memory so future maps inherit the graph
+      for (const e of map.entities || []) {
+        fetch('/memory/store', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: `[${e.type || 'entity'}] ${e.name}${e.notes ? ': ' + e.notes : ''}`, confidence: 0.75, source: topic, tags: [e.type, topic].filter(Boolean) }),
+        }).catch(() => {})
+      }
+      for (const r of map.relationships || []) {
+        fetch('/memory/store', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: `[relation] ${r.from} — ${r.relation} → ${r.to}`, confidence: 0.8, source: topic, tags: [r.from, r.to, r.relation, topic].filter(Boolean) }),
+        }).catch(() => {})
+      }
+
+      // ── Web Expansion: second-degree network trace ───────────────────────
+      setStatusMsg('Extending the web — tracing second-degree connections…')
+      const expand = await callClaudeJSON(
+        EXTRACT_MODEL,
+        SYS_EXPAND,
+        `Investigation topic: ${topic}\n\nEntity map:\n${JSON.stringify(map, null, 2)}`,
+        2048,
+      ) || {}
+      if (abortRef.current) return
+
       // ── Phase 2: MYCELIUM SPREAD ─────────────────────────────────────────
       setPhase('researching')
-      setStatusMsg('Spreading mycelium — deep research underway…')
+      setStatusMsg('Spreading mycelium — querying archive sources…')
 
       let archiveCtx = ''
-      setStatusMsg('Spreading mycelium — querying archive sources…')
       archiveCtx = await callBuggy(topic, map.archiveSources || [])
       if (archiveCtx) setStatusMsg('Spreading mycelium — analysing archive context…')
 
@@ -743,15 +850,18 @@ export default function App() {
         '',
         'Entity map from SPORE CAST:',
         JSON.stringify(map, null, 2),
+        expand.expandedEntities?.length
+          ? `\nSecond-degree network expansion:\n${JSON.stringify(expand, null, 2)}`
+          : '',
         archiveCtx ? `\nArchive context:\n${archiveCtx}` : '',
         '',
-        'Conduct deep research. Extract findings with confidence scores. ' +
-        'Flag all inconsistencies and evidence gaps.',
+        'Conduct deep research. For each entity — primary and expanded — trace ' +
+        'funding, oversight, predecessors, successors, and parallel operations. ' +
+        'Extract findings with confidence scores. Flag all inconsistencies.',
       ].filter(Boolean).join('\n')
 
       const raw2 = await callClaude(EXTRACT_MODEL, SYS_RESEARCH, resPrompt)
       if (abortRef.current) return
-      const res = safeJSON(raw2)
       if (!res) throw new Error('MYCELIUM SPREAD returned unparseable JSON.')
       setResData(res)
 
@@ -772,11 +882,24 @@ export default function App() {
         'subplots, inconsistencies, and follow-up directives.',
       ].join('\n')
 
-      const raw3 = await callClaude(SYNTH_MODEL, SYS_SYNTH, synthPrompt)
+      const synth = await callClaudeJSON(SYNTH_MODEL, SYS_SYNTH, synthPrompt)
       if (abortRef.current) return
-      const synth = safeJSON(raw3)
       if (!synth) throw new Error('FRUITING BODY returned unparseable JSON.')
       setSynthData(synth)
+
+      // Persist synthesis to the memory pool (fire-and-forget)
+      if (synth.summary) {
+        fetch('/memory/store', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content:    `[${topic}] ${synth.summary}`,
+            confidence: synth.confidence || 0.7,
+            source:     topic,
+            tags:       (synth.cast || []).map(c => c.name).slice(0, 10),
+          }),
+        }).catch(() => {})
+      }
 
       setPhase('done')
       setStatusMsg('Investigation complete.')
@@ -796,6 +919,7 @@ export default function App() {
     setMapData(null)
     setResData(null)
     setSynthData(null)
+    setMemoryData(null)
     setError('')
     setStatusMsg('')
     setTopic('')
@@ -841,7 +965,7 @@ export default function App() {
             <div style={S.logoPlaceholder}>🍄</div>
           ) : (
             <img
-              src="/logo.jpeg"
+              src="/logo.png"
               alt="FungAI P.I."
               style={S.logo}
               onError={() => setLogoError(true)}
@@ -1092,12 +1216,13 @@ export default function App() {
                       </span>
                     </div>
                     <div style={{ fontSize: '11px', color: C.dim, marginBottom: '12px', fontFamily: '"Space Mono", monospace' }}>
-                      Drag nodes · scroll to zoom · solid lines = mapped relationships · dashed = co-occurrence
+                      Drag nodes · scroll to zoom · solid = mapped · dashed = co-occurrence · dim/dashed = recalled from memory
                     </div>
                     <ConnectionsGraph
                       mapData={mapData}
                       resData={resData}
                       synthData={synthData}
+                      memoryData={memoryData}
                     />
                   </div>
                 )}
