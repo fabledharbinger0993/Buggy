@@ -1,4 +1,22 @@
-# ArchiveLens
+# Buggy
+
+A web search agent: deep archive crawling, context focused high confidence pathways, can build cliff notes to fully sourced research.
+
+## Tracing (AI Toolkit OTLP)
+
+Tracing is now wired in the ArchiveLens service worker (`archivelens/background/service-worker.js`) and exports OTLP spans to:
+
+- `http://localhost:4318/v1/traces` (default)
+
+You can configure tracing through stored settings keys in IndexedDB defaults (`archivelens/background/db.js`):
+
+- `tracingEnabled` (default `true`)
+- `tracingEndpoint` (default `http://localhost:4318/v1/traces`)
+- `tracingServiceName` (default `archivelens-extension`)
+
+Instrumented operations include session start, crawl source execution, retry/fetch outcomes, Ollama calls, entity resolution, fact-checking, and context brief generation.
+
+## ArchiveLens
 
 **ArchiveLens** is a Chrome/Firefox browser extension that acts as an intelligent archival research assistant. It crawls publicly accessible declassified document repositories, performs entity extraction and relational mapping via a locally running [Ollama](https://ollama.com) model, and synthesises findings into structured research outputs — all without sending your data to external servers (except outbound HTTP to target archival sites).
 
