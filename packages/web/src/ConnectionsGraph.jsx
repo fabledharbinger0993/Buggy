@@ -49,15 +49,13 @@ function buildGraph(mapData, resData, synthData, memoryData) {
         fromMemory,
       })
     } else if (!fromMemory) {
-      // Fresh discovery takes precedence — clear memory-only flag
-      const n = nodeMap.get(key)
-      if (n.fromMemory) {
-        n.label = name.trim()
-        n.type = type || 'entity'
-        n.r = type === 'person' ? 8 : 6
-        n.conf = Number(confidence ?? 0.7)
+      const node = nodeMap.get(key)
+      if ((node.fromMemory || node.type === 'entity') && type && type !== 'entity') {
+        node.type = type
+        node.r = type === 'person' ? 8 : 6
+        node.conf = Number(confidence ?? 0.7)
       }
-      n.fromMemory = false
+      node.fromMemory = false
     }
   }
 
@@ -70,7 +68,10 @@ function buildGraph(mapData, resData, synthData, memoryData) {
     addNode(e.to,   'entity', 0.5, true)
     if (s && t && s !== t) {
       const key = `${s}→${t}`
-      if (!linkSet.has(key)) {
+      const mapped = (mapData?.relationships || []).some(r =>
+        r.from?.trim().toLowerCase() === s && r.to?.trim().toLowerCase() === t
+      )
+      if (!mapped && !linkSet.has(key)) {
         linkSet.add(key)
         links.push({ source: s, target: t, label: e.relation || 'recalled', fromMemory: true })
       }
@@ -137,7 +138,7 @@ export default function ConnectionsGraph({ mapData, resData, synthData, memoryDa
 
     const { nodes, links } = buildGraph(mapData, resData, synthData, memoryData)
     // Merge manual links added by the user; clone to avoid mutation issues
-    const liveLinkData = [...links, ...manualLinksRef.current.map(link => ({ ...link }))]
+    const liveLinkData = [...links, ...manualLinksRef.current]
     pendingRef.current = null
 
     el.innerHTML = ''
@@ -265,16 +266,7 @@ export default function ConnectionsGraph({ mapData, resData, synthData, memoryDa
       .text(d => d.label.length > 18 ? d.label.slice(0, 16) + '…' : d.label)
 
     // ── Manual link: click two nodes to draw a thread ──────────────────────────
-    node.attr('tabindex', 0)
-      .attr('role', 'button')
-      .attr('aria-label', d => `Link node ${d.label}`)
-      .on('keydown', function(e) {
-        if (!linkModeRef.current || (e.key !== 'Enter' && e.key !== ' ')) return
-        e.preventDefault()
-        e.stopPropagation()
-        d3.select(this).dispatch('click')
-      })
-      .on('click', (e, d) => {
+    node.on('click', (e, d) => {
       if (!linkModeRef.current) return
       e.stopPropagation()
 
