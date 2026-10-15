@@ -50,7 +50,14 @@ function buildGraph(mapData, resData, synthData, memoryData) {
       })
     } else if (!fromMemory) {
       // Fresh discovery takes precedence — clear memory-only flag
-      nodeMap.get(key).fromMemory = false
+      const n = nodeMap.get(key)
+      if (n.fromMemory) {
+        n.label = name.trim()
+        n.type = type || 'entity'
+        n.r = type === 'person' ? 8 : 6
+        n.conf = Number(confidence ?? 0.7)
+      }
+      n.fromMemory = false
     }
   }
 
