@@ -22,6 +22,7 @@ export default defineConfig({
       '/congress':      { target: SERVICE, changeOrigin: true },
       '/investigate':   { target: SERVICE, changeOrigin: true },
       '/memory':        { target: SERVICE, changeOrigin: true },
+      '/auth':          { target: SERVICE, changeOrigin: true },
     },
   },
 })

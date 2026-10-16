@@ -22,7 +22,7 @@
  */
 
 import express from "express";
-import { randomUUID } from "crypto";
+import { randomUUID, createHmac, timingSafeEqual } from "crypto";
 import { fileURLToPath } from "url";
 import path from "path";
 import { existsSync } from "fs";
@@ -84,12 +84,87 @@ app.use((req, res, next) => {
   next();
 });
 
-// API key middleware for sensitive endpoints
-function requireApiKey(req, res, next) {
-  if (req.headers["x-api-key"] !== process.env.INTERNAL_API_KEY) {
-    return res.status(403).json({ error: "Forbidden" });
+// ─── Site login (cookie session) ──────────────────────────────────────────────
+// The browser cannot hold INTERNAL_API_KEY, so it logs in with SITE_PASSWORD and
+// receives a signed, httpOnly cookie that requireApiKey accepts in place of the key.
+
+const SESSION_COOKIE = "fungai_session";
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const LOGIN_MAX_FAILS = 5;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const loginFails = new Map(); // ip → { count, resetAt }
+
+app.set("trust proxy", 1); // Railway terminates TLS; needed for req.ip / req.secure
+
+function safeEqual(a, b) {
+  const ab = Buffer.from(String(a));
+  const bb = Buffer.from(String(b));
+  return ab.length === bb.length && timingSafeEqual(ab, bb);
+}
+
+function signSession(expiry) {
+  const secret = `${process.env.SITE_PASSWORD || ""}|${process.env.INTERNAL_API_KEY || ""}`;
+  return createHmac("sha256", secret).update(String(expiry)).digest("hex");
+}
+
+function hasValidSession(req) {
+  if (!process.env.SITE_PASSWORD) return false;
+  const raw = (req.headers.cookie || "")
+    .split(";")
+    .map(c => c.trim())
+    .find(c => c.startsWith(`${SESSION_COOKIE}=`));
+  if (!raw) return false;
+  const [expiry, sig] = decodeURIComponent(raw.slice(SESSION_COOKIE.length + 1)).split(".");
+  if (!expiry || !sig || !(Number(expiry) > Date.now())) return false;
+  return safeEqual(sig, signSession(expiry));
+}
+
+app.post("/auth/login", (req, res) => {
+  if (!process.env.SITE_PASSWORD) {
+    return res.status(503).json({ ok: false, error: "Login is not configured" });
   }
-  next();
+  const now = Date.now();
+  const rec = loginFails.get(req.ip);
+  if (rec && rec.resetAt > now && rec.count >= LOGIN_MAX_FAILS) {
+    return res.status(429).json({ ok: false, error: "Too many attempts, try again later" });
+  }
+  const { password } = req.body || {};
+  if (typeof password !== "string" || !safeEqual(password, process.env.SITE_PASSWORD)) {
+    const cur = rec && rec.resetAt > now ? rec : { count: 0, resetAt: now + LOGIN_WINDOW_MS };
+    cur.count += 1;
+    loginFails.set(req.ip, cur);
+    return res.status(401).json({ ok: false, error: "Wrong password" });
+  }
+  loginFails.delete(req.ip);
+  const expiry = now + SESSION_TTL_MS;
+  const value = encodeURIComponent(`${expiry}.${signSession(expiry)}`);
+  res.setHeader(
+    "Set-Cookie",
+    `${SESSION_COOKIE}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_TTL_MS / 1000}${req.secure ? "; Secure" : ""}`,
+  );
+  res.json({ ok: true });
+});
+
+app.get("/auth/session", (req, res) => {
+  res.json({ ok: hasValidSession(req) });
+});
+
+app.post("/auth/logout", (req, res) => {
+  res.setHeader("Set-Cookie", `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
+  res.json({ ok: true });
+});
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, rec] of loginFails) if (rec.resetAt <= now) loginFails.delete(ip);
+}, LOGIN_WINDOW_MS).unref();
+
+// Auth middleware for sensitive endpoints: internal API key OR a logged-in session
+function requireApiKey(req, res, next) {
+  const key = process.env.INTERNAL_API_KEY;
+  if (key && req.headers["x-api-key"] === key) return next();
+  if (hasValidSession(req)) return next();
+  return res.status(403).json({ error: "Forbidden" });
 }
 
 // Active jobs: jobId → { status, progress, sessionId, traceId, updatedAt }
