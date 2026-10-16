@@ -757,12 +757,12 @@ async function listSessions(query) {
 // Optional:        fungai_MODEL (default: claude-haiku-4-5-20251001 — fast + cheap for bulk extraction)
 //                  fungai_SYNTH_MODEL (default: claude-sonnet-4-6 — for context brief + tribunal)
 
-const ANTHROPIC_API_KEY = "sk-ant-usr-1s_YHbO1sX8GleWkW1xb2KtVJYZHTFCXbnPixHm_mnnlqVjV2HRBMmw3W_y089zvcquM9OmdLRuVsl2NFl5_Aeg_gPahQA";
+const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
 const EXTRACT_MODEL = process.env.fungai_MODEL       || "claude-haiku-4-5-20251001";
 const SYNTH_MODEL   = process.env.fungai_SYNTH_MODEL || "claude-sonnet-4-6";
 
 async function callClaude(system, prompt, { model = EXTRACT_MODEL, maxTokens = 2048 } = {}) {
-  const resp = await fetch(ANTHROPIC_API_KEY, {
+  const resp = await fetch(ANTHROPIC_API, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

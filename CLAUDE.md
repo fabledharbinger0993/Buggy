@@ -27,9 +27,7 @@ npm install
 npm run dev
 
 # Service only (requires ANTHROPIC_API_KEY)
-ANTHROPIC_API_KEY=sk-ant-usr-1s_YHbO1sX8GleWkW1xb2KtVJYZHTFCXbnPixHm_mnnlqVjV2HRBMmw3W_y089zvcquM9OmdLRuVsl2NFl5_Aeg_gPahQA
-
-npm run start:service
+ANTHROPIC_API_KEY=sk-ant-... npm run start:service
 
 # Web only
 npm run dev -w packages/web
@@ -39,7 +37,7 @@ npm run dev -w packages/web
 
 | Variable           | Required | Default              | Purpose                          |
 | ------------------ | -------- | -------------------- | -------------------------------- |
-| ANTHROPIC_API_KEY  | Yes      | sk-ant-usr-1s_YHbO1sX8GleWkW1xb2KtVJYZHTFCXbnPixHm_mnnlqVjV2HRBMmw3W_y089zvcquM9OmdLRuVsl2NFl5_Aeg_gPahQA                    | Claude API access for service    |
+| ANTHROPIC_API_KEY  | Yes      | —                    | Claude API access for service    |
 | fungai_PORT         | No       | 5050                 | Service listen port              |
 | fungai_DATA_DIR     | No       | ~/.fungai-service     | SQLite database directory        |
 | fungai_MODEL        | No       | claude-haiku-4-5-20251001 | Extraction model            |
