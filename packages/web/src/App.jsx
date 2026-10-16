@@ -1,6 +1,7 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import MyceliumCanvas from './MyceliumCanvas.jsx'
 import ConnectionsGraph from './ConnectionsGraph.jsx'
+import { emptyNetwork, mergeNetwork, networkContext, networkSynthesisInput } from './network.js'
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 
@@ -323,6 +324,30 @@ const S = {
     cursor: 'pointer',
   },
 
+  networkBar: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '10px',
+    alignItems: 'center',
+    marginBottom: '24px',
+    padding: '12px 14px',
+    background: C.bgPanel,
+    border: `1px solid ${C.border}`,
+    borderRadius: '6px',
+  },
+
+  networkField: {
+    background: C.bgCard,
+    border: `1px solid ${C.border}`,
+    borderRadius: '4px',
+    color: C.cream,
+    fontFamily: '"Space Mono", monospace',
+    fontSize: '13px',
+    padding: '8px 10px',
+    outline: 'none',
+    minWidth: 0,
+  },
+
   exampleGrid: {
     display: 'flex',
     flexWrap: 'wrap',
@@ -457,6 +482,7 @@ const S = {
     gap: '2px',
     borderBottom: `1px solid ${C.border}`,
     marginBottom: '22px',
+    overflowX: 'auto', // four tabs outgrow phone width; scroll the bar, not the page
   },
 
   tab: {
@@ -631,23 +657,48 @@ async function fetchPriorIntelligence(topic) {
   const memories  = memR.status       === 'fulfilled' ? (memR.value?.results   || []) : []
   const neighbors = neighborsR.status === 'fulfilled' ? (neighborsR.value?.neighbors || []) : []
 
-  // Parse stored nodes: "[type] name: context" → graph nodes
+  // Parse stored memories: "[relation] A — rel → B" → graph edges,
+  // "[type] name: context" → graph nodes (the formats written by runSearch)
   const memNodes = []
+  const memEdges = []
   for (const r of memories) {
-    const m = typeof r.content === 'string' ? r.content.match(/^\[([^\]]+)\]\s+([^:]+)/) : null
+    if (typeof r.content !== 'string') continue
+    const rel = r.content.match(/^\[relation\]\s+(.+?)\s+—\s+(.+?)\s+→\s+(.+)$/)
+    if (rel) {
+      memEdges.push({ from: rel[1].trim(), to: rel[3].trim(), relation: rel[2].trim(), fromMemory: true })
+      continue
+    }
+    const m = r.content.match(/^\[([^\]]+)\]\s+([^:]+)/)
     if (m) memNodes.push({ name: m[2].trim(), type: m[1].toLowerCase(), confidence: r.confidence, fromMemory: true })
   }
-
-  // Neighbor relationships → graph edges
-  const recalledEdges = neighborsR.status === 'fulfilled' ? (neighborsR.value?.edges || []) : []
-  const memEdges = recalledEdges.slice(0, 20).map(e => ({
-    from: e.source, to: e.target, relation: e.relationship, fromMemory: true,
-  }))
 
   const memCtx      = memories.map(r => r.content).join('\n').slice(0, 2000)
   const neighborCtx = neighbors.slice(0, 20).map(n => n.concept).join(', ')
 
   return { memories, neighbors, memNodes, memEdges, memCtx, neighborCtx }
+}
+
+async function listNetworks() {
+  const resp = await fetch('/networks')
+  if (!resp.ok) throw new Error(`Could not list networks (${resp.status})`)
+  return resp.json()
+}
+
+async function fetchNetwork(id) {
+  const resp = await fetch(`/networks/${encodeURIComponent(id)}`)
+  if (!resp.ok) throw new Error(`Could not open network (${resp.status})`)
+  return resp.json()
+}
+
+async function saveNetwork(network) {
+  const resp = await fetch(`/networks/${encodeURIComponent(network.id)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(network),
+  })
+  const data = await resp.json().catch(() => ({}))
+  if (!resp.ok || !data.ok) throw new Error(data.error || `Save failed (${resp.status})`)
+  return data
 }
 
 async function callfungai(subject, sources) {
@@ -705,14 +756,24 @@ function EntityCard({ entity }) {
           aka: {entity.aliases.join(', ')}
         </div>
       )}
+      {entity.foundIn?.length > 1 && (
+        <div style={{ marginTop: '6px', fontSize: '11px', color: C.amber }}>
+          ↔ linked across: {entity.foundIn.join(' · ')}
+        </div>
+      )}
     </div>
   )
 }
 
-function FindingCard({ finding, idx }) {
+function FindingCard({ finding, idx, showTopic }) {
   const conf = Number(finding.confidence || 0)
   return (
     <div style={{ ...S.card, borderLeft: `3px solid ${confColor(conf)}` }}>
+      {showTopic && finding.topic && (
+        <div style={{ fontSize: '10px', color: C.purple, marginBottom: '6px', letterSpacing: '0.1em' }}>
+          from: {finding.topic}
+        </div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'flex-start' }}>
         <div style={{ fontSize: '13px', color: C.cream, lineHeight: 1.6, flex: 1 }}>
           {idx != null && (
@@ -768,63 +829,131 @@ function CastCard({ person }) {
 export default function App() {
   const [topic,        setTopic]        = useState('')
   const [phase,        setPhase]        = useState('idle')
-  const [mapData,      setMapData]      = useState(null)
-  const [resData,      setResData]      = useState(null)
-  const [synthData,    setSynthData]    = useState(null)
+  const [network,      setNetwork]      = useState(() => emptyNetwork())
+  const [networks,     setNetworks]     = useState([])   // saved network summaries
+  const [live,         setLive]         = useState(null) // search in progress (not yet saved)
   const [memoryData,   setMemoryData]   = useState(null)
+  const [briefChoice,  setBriefChoice]  = useState(null) // search id, 'network', or null = latest
+  const [netBusy,      setNetBusy]      = useState(false)
   const [error,        setError]        = useState('')
   const [statusMsg,    setStatusMsg]    = useState('')
   const [activeTab,    setActiveTab]    = useState('map')
   const [logoError,    setLogoError]    = useState(false)
-  const abortRef = useRef(false)
+  const networkRef = useRef(network)
+  const runIdRef   = useRef(0) // bumped to cancel an in-flight search (clear / switch network)
+
+  const replaceNetwork = useCallback(next => {
+    networkRef.current = next
+    setNetwork(next)
+  }, [])
+
+  const refreshList = useCallback(() => {
+    listNetworks().then(setNetworks).catch(() => {})
+  }, [])
+
+  // Save, then record the server's timestamps without clobbering edits made meanwhile.
+  const persist = useCallback(async next => {
+    try {
+      const { updatedAt, createdAt } = await saveNetwork(next)
+      if (networkRef.current.id === next.id) {
+        replaceNetwork({ ...networkRef.current, updatedAt, createdAt })
+      }
+      refreshList()
+    } catch (err) {
+      setError(`Network not saved: ${err.message}`)
+    }
+  }, [replaceNetwork, refreshList])
+
+  // Open the most recently updated network on load.
+  useEffect(() => {
+    listNetworks()
+      .then(list => {
+        setNetworks(list)
+        if (list.length) return fetchNetwork(list[0].id).then(replaceNetwork)
+      })
+      .catch(err => setError(err.message))
+  }, [replaceNetwork])
+
+  const searches = useMemo(
+    () => (live ? [...network.searches, live] : network.searches),
+    [network.searches, live],
+  )
+  const merged  = useMemo(() => mergeNetwork(searches), [searches])
+  const mapData = merged.map
+  const resData = merged.res
+
+  const briefs = searches.filter(s => s.synth)
+  const synthData =
+    briefChoice === 'network'
+      ? network.networkBrief?.synth || null
+      : (briefs.find(s => s.id === briefChoice) || briefs[briefs.length - 1])?.synth || null
+  const multiSearch = searches.length > 1
 
   const entityCount =
     (mapData?.entities?.length  || 0) +
     (resData?.entities?.length  || 0) +
-    (synthData?.cast?.length    || 0)
+    (merged.synth?.cast?.length || 0)
 
-  const resetAndRun = useCallback(async () => {
+  const runSearch = useCallback(async () => {
     if (!topic.trim()) return
-    abortRef.current = false
+    const runId = ++runIdRef.current
+    const cancelled = () => runIdRef.current !== runId
+    const prior = networkRef.current
+    const searchTopic = topic.trim()
+    let search = { id: crypto.randomUUID(), topic: searchTopic, at: Date.now() }
+    const update = patch => { search = { ...search, ...patch }; setLive(search) }
+
     setError('')
-    setMapData(null)
-    setResData(null)
-    setSynthData(null)
-    setMemoryData(null)
+    setLive(search)
+    setBriefChoice(null)
     setActiveTab('map')
+
+    // Searches build on the case: the existing network goes into every phase prompt.
+    const existingCtx = networkContext(mergeNetwork(prior.searches))
+    const networkBlock = existingCtx
+      ? `\n\nExisting network in this case (from ${prior.searches.length} prior search` +
+        `${prior.searches.length === 1 ? '' : 'es'}):\n${existingCtx}\n\n` +
+        'Where this topic genuinely connects to existing nodes, reuse their exact names and ' +
+        'state those relationships. Do not invent connections that the evidence does not support.'
+      : ''
 
     // ── Phase 1: SPORE CAST ──────────────────────────────────────────────────
     try {
       setPhase('mapping')
       setStatusMsg('Querying memory network for prior intelligence…')
-      const { memories, neighbors } = await fetchPriorIntelligence(topic)
+      const { memories, neighbors, memNodes, memEdges } = await fetchPriorIntelligence(searchTopic)
+      if (cancelled()) return
+      setMemoryData({ nodes: memNodes, edges: memEdges })
       const memCtx      = memories.map(r => r.content).join('\n')
       const neighborCtx = neighbors.map(n => n.concept).join(', ')
 
-      setStatusMsg('Casting spores — mapping the investigation space…')
+      setStatusMsg(prior.searches.length
+        ? 'Casting spores — extending the existing network…'
+        : 'Casting spores — mapping the investigation space…')
 
       const map = await callClaudeJSON(
         EXTRACT_MODEL,
         SYS_MAP,
-        `Investigation topic: ${topic}` +
+        `Investigation topic: ${searchTopic}` +
         (memCtx      ? `\n\nPrior intelligence from memory:\n${memCtx}`                          : '') +
-        (neighborCtx ? `\n\nRelated concepts from prior investigations: ${neighborCtx}` : ''),
+        (neighborCtx ? `\n\nRelated concepts from prior investigations: ${neighborCtx}` : '') +
+        networkBlock,
       )
-      if (abortRef.current) return
+      if (cancelled()) return
       if (!map) throw new Error('SPORE CAST returned unparseable JSON. Please retry the investigation.')
-      setMapData(map)
+      update({ map })
 
       // Store SPORE CAST entities + relationships to memory so future maps inherit the graph
       for (const e of map.entities || []) {
         fetch('/memory/store', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: `[${e.type || 'entity'}] ${e.name}${e.notes ? ': ' + e.notes : ''}`, confidence: 0.75, source: topic, tags: [e.type, topic].filter(Boolean) }),
+          body: JSON.stringify({ content: `[${e.type || 'entity'}] ${e.name}${e.notes ? ': ' + e.notes : ''}`, confidence: 0.75, source: searchTopic, tags: [e.type, searchTopic].filter(Boolean) }),
         }).catch(() => {})
       }
       for (const r of map.relationships || []) {
         fetch('/memory/store', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: `[relation] ${r.from} — ${r.relation} → ${r.to}`, confidence: 0.8, source: topic, tags: [r.from, r.to, r.relation, topic].filter(Boolean) }),
+          body: JSON.stringify({ content: `[relation] ${r.from} — ${r.relation} → ${r.to}`, confidence: 0.8, source: searchTopic, tags: [r.from, r.to, r.relation, searchTopic].filter(Boolean) }),
         }).catch(() => {})
       }
 
@@ -833,21 +962,22 @@ export default function App() {
       const expand = await callClaudeJSON(
         EXTRACT_MODEL,
         SYS_EXPAND,
-        `Investigation topic: ${topic}\n\nEntity map:\n${JSON.stringify(map, null, 2)}`,
+        `Investigation topic: ${searchTopic}\n\nEntity map:\n${JSON.stringify(map, null, 2)}`,
         2048,
       ) || {}
-      if (abortRef.current) return
+      if (cancelled()) return
+      update({ expand })
 
       // ── Phase 2: MYCELIUM SPREAD ─────────────────────────────────────────
       setPhase('researching')
       setStatusMsg('Spreading mycelium — querying archive sources…')
 
       let archiveCtx = ''
-      archiveCtx = await callfungai(topic, map.archiveSources || [])
+      archiveCtx = await callfungai(searchTopic, map.archiveSources || [])
       if (archiveCtx) setStatusMsg('Spreading mycelium — analysing archive context…')
 
       const resPrompt = [
-        `Investigation topic: ${topic}`,
+        `Investigation topic: ${searchTopic}`,
         '',
         'Entity map from SPORE CAST:',
         JSON.stringify(map, null, 2),
@@ -855,6 +985,7 @@ export default function App() {
           ? `\nSecond-degree network expansion:\n${JSON.stringify(expand, null, 2)}`
           : '',
         archiveCtx ? `\nArchive context:\n${archiveCtx}` : '',
+        networkBlock,
         '',
         'Conduct deep research. For each entity — primary and expanded — trace ' +
         'funding, oversight, predecessors, successors, and parallel operations. ' +
@@ -862,16 +993,16 @@ export default function App() {
       ].filter(Boolean).join('\n')
 
       const res = await callClaudeJSON(EXTRACT_MODEL, SYS_RESEARCH, resPrompt)
-      if (abortRef.current) return
+      if (cancelled()) return
       if (!res) throw new Error('MYCELIUM SPREAD returned unparseable JSON.')
-      setResData(res)
+      update({ res })
 
       // ── Phase 3: FRUITING BODY ───────────────────────────────────────────
       setPhase('synthesizing')
       setStatusMsg('Forming fruiting body — synthesising intelligence brief…')
 
       const synthPrompt = [
-        `Investigation topic: ${topic}`,
+        `Investigation topic: ${searchTopic}`,
         '',
         'Entity map (SPORE CAST):',
         JSON.stringify(map, null, 2),
@@ -884,9 +1015,9 @@ export default function App() {
       ].join('\n')
 
       const synth = await callClaudeJSON(SYNTH_MODEL, SYS_SYNTH, synthPrompt)
-      if (abortRef.current) return
+      if (cancelled()) return
       if (!synth) throw new Error('FRUITING BODY returned unparseable JSON.')
-      setSynthData(synth)
+      update({ synth })
 
       // Persist synthesis to the memory pool (fire-and-forget)
       if (synth.summary) {
@@ -894,54 +1025,122 @@ export default function App() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            content:    `[${topic}] ${synth.summary}`,
+            content:    `[${searchTopic}] ${synth.summary}`,
             confidence: synth.confidence ?? 0.7,
-            source:     topic,
+            source:     searchTopic,
             tags:       (synth.cast || []).map(c => c.name).slice(0, 10),
           }),
         }).catch(() => {})
       }
 
       setPhase('done')
-      setStatusMsg('Investigation complete.')
+      setStatusMsg(`Added to network — ${networkRef.current.searches.length + 1} searches in this case.`)
       setActiveTab('synth')
+      setTopic('')
     } catch (err) {
-      if (!abortRef.current) {
-        setError(err.message)
-        setPhase('error')
-        setStatusMsg('')
-      }
+      if (cancelled()) return
+      setError(err.message)
+      setPhase('error')
+      setStatusMsg('')
     }
-  }, [topic])
 
-  function handleReset() {
-    abortRef.current = true
+    // Keep whatever phases completed (a failed search can still add its spore map).
+    if (cancelled() || !search.map) { setLive(null); return }
+    const next = { ...networkRef.current, searches: [...networkRef.current.searches, search] }
+    replaceNetwork(next)
+    setLive(null)
+    persist(next)
+  }, [topic, replaceNetwork, persist])
+
+  const synthesizeNetwork = useCallback(async () => {
+    const current = networkRef.current
+    if (current.searches.length < 2) return
+    setNetBusy(true)
+    setError('')
+    try {
+      const input = networkSynthesisInput(current, mergeNetwork(current.searches))
+      const synth = await callClaudeJSON(
+        SYNTH_MODEL,
+        SYS_SYNTH,
+        `This case combines ${current.searches.length} searches: ` +
+        `${current.searches.map(s => s.topic).join(' | ')}\n\n` +
+        `Combined network:\n${JSON.stringify(input, null, 2)}\n\n` +
+        'Produce one intelligence brief for the whole network. Focus on connections ' +
+        'that span searches: shared actors, overlapping timelines, and patterns that only ' +
+        'appear when the searches are read together.',
+      )
+      if (!synth) throw new Error('Network synthesis returned unparseable JSON.')
+      if (networkRef.current.id !== current.id) return
+      const next = {
+        ...networkRef.current,
+        networkBrief: { at: Date.now(), searchCount: current.searches.length, synth },
+      }
+      replaceNetwork(next)
+      setBriefChoice('network')
+      persist(next)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setNetBusy(false)
+    }
+  }, [replaceNetwork, persist])
+
+  // Leave the current network as saved and reset the run state.
+  function resetRun() {
+    runIdRef.current++
+    setLive(null)
     setPhase('idle')
-    setMapData(null)
-    setResData(null)
-    setSynthData(null)
     setMemoryData(null)
+    setBriefChoice(null)
     setError('')
     setStatusMsg('')
-    setTopic('')
+    setActiveTab('map')
   }
 
+  // Clear Substrate: start a fresh network; the current one stays saved and reopenable.
+  function handleReset() {
+    resetRun()
+    setTopic('')
+    replaceNetwork(emptyNetwork())
+  }
+
+  async function handleOpenNetwork(id) {
+    if (id === networkRef.current.id) return
+    resetRun()
+    try {
+      replaceNetwork(await fetchNetwork(id))
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  function handleRename(name) {
+    const next = { ...networkRef.current, name }
+    replaceNetwork(next)
+  }
+
+  function commitRename() {
+    const current = networkRef.current
+    if (!current.name.trim()) replaceNetwork({ ...current, name: 'Untitled network' })
+    // Unsaved drafts get their name on first save; saved networks save the rename now.
+    if (current.searches.length) persist(networkRef.current)
+  }
+
+  // Follow-up directives extend the current network instead of resetting it.
   function handleFollowUp(directive) {
-    handleReset()
-    setTimeout(() => {
-      setTopic(directive)
-    }, 50)
+    setTopic(directive)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const isActive = ['mapping', 'researching', 'synthesizing'].includes(phase)
-  const isDone   = phase === 'done'
-  const isIdle   = phase === 'idle' || phase === 'error'
+  const hasResults = Boolean(mapData || resData || synthData || briefs.length)
+  const isSaved = networks.some(n => n.id === network.id)
 
   const TABS = [
     { id: 'map',   label: 'Spore Map',     data: mapData  },
     { id: 'res',   label: 'Mycelium',      data: resData  },
-    { id: 'synth', label: 'Fruiting Body', data: synthData },
-    { id: 'graph', label: 'Connections',   data: mapData || resData || synthData },
+    { id: 'synth', label: 'Fruiting Body', data: briefs.length || network.networkBrief },
+    { id: 'graph', label: 'Connections',   data: mapData || resData || merged.synth },
   ]
 
   return (
@@ -988,77 +1187,109 @@ export default function App() {
           <div style={S.errorBox}>⚠ {error}</div>
         )}
 
-        {/* ── Idle: topic input ─────────────────────────────────────────── */}
-        {isIdle && (
+        {/* ── Network: pick, name, or start a new one ──────────────────── */}
+        <div style={S.networkBar}>
+          <label htmlFor="network-picker" style={{ ...S.label, marginBottom: 0 }}>Network</label>
+          <select
+            id="network-picker"
+            style={{ ...S.networkField, flex: '1 1 160px' }}
+            value={network.id}
+            disabled={isActive}
+            onChange={e => handleOpenNetwork(e.target.value)}
+          >
+            {!isSaved && <option value={network.id}>{network.name} (new)</option>}
+            {networks.map(n => (
+              <option key={n.id} value={n.id}>
+                {n.id === network.id ? network.name : n.name} · {n.searchCount} search{n.searchCount === 1 ? '' : 'es'}
+              </option>
+            ))}
+          </select>
+          <input
+            aria-label="Network name"
+            style={{ ...S.networkField, flex: '1 1 160px' }}
+            value={network.name}
+            maxLength={200}
+            onChange={e => handleRename(e.target.value)}
+            onBlur={commitRename}
+            onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
+          />
+          <button
+            style={{ ...S.btnSecondary, padding: '8px 14px' }}
+            onClick={handleReset}
+            title="Start a new network. The current one stays saved."
+          >
+            ↺ Clear Substrate
+          </button>
+        </div>
+
+        {/* ── Topic input: always available between searches ───────────── */}
+        {!isActive && (
           <div style={S.section}>
-            <label style={S.label}>Investigation Topic</label>
+            <label htmlFor="topic-input" style={S.label}>
+              {network.searches.length ? 'Extend this network' : 'Investigation Topic'}
+            </label>
             <textarea
+              id="topic-input"
               style={S.input}
-              placeholder="Describe what you want to investigate…"
+              placeholder={network.searches.length
+                ? 'Add another search — new findings link into the existing network…'
+                : 'Describe what you want to investigate…'}
               value={topic}
               onChange={e => setTopic(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) resetAndRun() }}
+              onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) runSearch() }}
             />
-            <div style={S.exampleGrid}>
-              {EXAMPLES.map((ex, i) => (
-                <button key={i} style={S.exampleChip} onClick={() => setTopic(ex)}>
-                  {ex}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ── Idle: action buttons ──────────────────────────────────────── */}
-        {isIdle && (
-          <div style={{ ...S.row, marginBottom: '28px' }}>
-            <button style={S.btnPrimary} onClick={resetAndRun}>
-              ◉ Inoculate
-            </button>
-            {topic.trim() && (
-              <button style={S.btnSecondary} onClick={handleReset}>
-                ↺ Clear Substrate
-              </button>
+            {!network.searches.length && (
+              <div style={S.exampleGrid}>
+                {EXAMPLES.map((ex, i) => (
+                  <button key={i} style={S.exampleChip} onClick={() => setTopic(ex)}>
+                    {ex}
+                  </button>
+                ))}
+              </div>
             )}
+            <div style={{ ...S.row, marginTop: '14px' }}>
+              <button style={S.btnPrimary} onClick={runSearch} disabled={!topic.trim()}>
+                ◉ Inoculate
+              </button>
+            </div>
           </div>
         )}
 
-        {/* ── Active / done: phase indicators ──────────────────────────── */}
-        {(isActive || isDone) && (
+        {(isActive || hasResults || phase === 'done') && (
           <>
-            <div style={S.phases}>
-              <PhaseStep
-                num="01" label="SPORE CAST"
-                active={phase === 'mapping'}
-                done={['researching', 'synthesizing', 'done'].includes(phase)}
-              />
-              <PhaseStep
-                num="02" label="MYCELIUM SPREAD"
-                active={phase === 'researching'}
-                done={['synthesizing', 'done'].includes(phase)}
-              />
-              <PhaseStep
-                num="03" label="FRUITING BODY"
-                active={phase === 'synthesizing'}
-                done={phase === 'done'}
-              />
-            </div>
+            {/* ── Phase indicators for the current search ──────────────── */}
+            {(isActive || phase === 'done') && (
+              <div style={S.phases}>
+                <PhaseStep
+                  num="01" label="SPORE CAST"
+                  active={phase === 'mapping'}
+                  done={['researching', 'synthesizing', 'done'].includes(phase)}
+                />
+                <PhaseStep
+                  num="02" label="MYCELIUM SPREAD"
+                  active={phase === 'researching'}
+                  done={['synthesizing', 'done'].includes(phase)}
+                />
+                <PhaseStep
+                  num="03" label="FRUITING BODY"
+                  active={phase === 'synthesizing'}
+                  done={phase === 'done'}
+                />
+              </div>
+            )}
 
             {/* Status line */}
             {(isActive || statusMsg) && (
               <div style={S.status}>
                 {isActive && <div style={S.spinner} />}
-                <span style={{ color: isActive ? C.violet : C.amber }}>{statusMsg}</span>
+                <span style={{ color: isActive ? C.violet : C.amber }}>
+                  {isActive && live ? `${live.topic} — ` : ''}{statusMsg}
+                </span>
               </div>
             )}
 
-            {/* Reset button */}
-            <div style={{ marginBottom: '24px' }}>
-              <button style={S.btnSecondary} onClick={handleReset}>↺ Clear Substrate</button>
-            </div>
-
             {/* ── Results ───────────────────────────────────────────────── */}
-            {(mapData || resData || synthData) && (
+            {hasResults && (
               <>
                 {/* Tab bar */}
                 <div style={S.tabs}>
@@ -1151,7 +1382,7 @@ export default function App() {
                           Findings <span style={S.badge}>{resData.findings.length}</span>
                         </div>
                         {resData.findings.map((f, i) => (
-                          <FindingCard key={i} finding={f} idx={i} />
+                          <FindingCard key={i} finding={f} idx={i} showTopic={multiSearch} />
                         ))}
                       </div>
                     )}
@@ -1222,13 +1453,49 @@ export default function App() {
                     <ConnectionsGraph
                       mapData={mapData}
                       resData={resData}
-                      synthData={synthData}
+                      synthData={merged.synth}
                       memoryData={memoryData}
                     />
                   </div>
                 )}
 
                 {/* ── SYNTHESIS tab ─────────────────────────────────────── */}
+                {activeTab === 'synth' && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', marginBottom: '20px' }}>
+                    {briefs.map((s, i) => {
+                      const selected = briefChoice === s.id || (briefChoice == null && i === briefs.length - 1)
+                      return (
+                        <button
+                          key={s.id}
+                          style={{ ...S.btnGhost, ...(selected ? { background: `${C.amber}22`, borderColor: C.amber } : {}) }}
+                          onClick={() => setBriefChoice(s.id)}
+                          title={s.topic}
+                        >
+                          {String(i + 1).padStart(2, '0')} · {s.topic.length > 40 ? `${s.topic.slice(0, 40)}…` : s.topic}
+                        </button>
+                      )
+                    })}
+                    {network.networkBrief && (
+                      <button
+                        style={{ ...S.btnGhost, color: C.violet, borderColor: `${C.violet}66`,
+                                 ...(briefChoice === 'network' ? { background: `${C.violet}22`, borderColor: C.violet } : {}) }}
+                        onClick={() => setBriefChoice('network')}
+                      >
+                        ◈ Network brief ({network.networkBrief.searchCount} searches)
+                      </button>
+                    )}
+                    {network.searches.length >= 2 && (
+                      <button
+                        style={{ ...S.btnGhost, color: C.violet, borderColor: `${C.violet}66` }}
+                        onClick={synthesizeNetwork}
+                        disabled={netBusy || isActive}
+                      >
+                        {netBusy ? '… synthesizing network' : network.networkBrief ? '↻ Re-synthesize network' : '◈ Synthesize network'}
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 {activeTab === 'synth' && synthData && (
                   <div>
                     {/* Summary card */}

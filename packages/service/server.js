@@ -31,6 +31,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import {
   bulkPut,
   ensureDefaultSettings,
+  get,
   getAll,
   getAllByIndex,
   getSettings,
@@ -69,7 +70,10 @@ if (!process.env.HOLOGRAIM_URL) {
   console.warn("[memory] HOLOGRAIM_URL not set — memory features disabled");
 }
 const app = express();
-app.use(express.json());
+// Default 100kb JSON limit everywhere except /networks, which parses its own larger
+// bodies on the route — after the auth gate, so anonymous requests can't send 10mb.
+const parseJson = express.json();
+app.use((req, res, next) => (req.path.startsWith("/networks") ? next() : parseJson(req, res, next)));
 
 // Hardened CORS policy
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "").split(",").map(s => s.trim()).filter(Boolean);
@@ -908,6 +912,61 @@ app.get("/memory/neighbors", async (req, res) => {
     res.json(result || { concept, neighbors: [] });
   } catch {
     res.json({ concept: req.query.concept || "", neighbors: [] });
+  }
+});
+
+// ─── Investigation networks ───────────────────────────────────────────────────
+// A network is one saved case: the raw output of every search the user ran into it.
+// The web app merges searches for display; the server only stores and lists them.
+
+const NETWORK_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+app.get("/networks", async (_req, res) => {
+  try {
+    const networks = await getAll("networks");
+    res.json(
+      networks
+        .map(n => ({ id: n.id, name: n.name, updatedAt: n.updatedAt, searchCount: n.searches?.length || 0 }))
+        .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+    );
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get("/networks/:id", async (req, res) => {
+  try {
+    const network = await get("networks", req.params.id);
+    if (!network) return res.status(404).json({ ok: false, error: "Network not found" });
+    res.json(network);
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.put("/networks/:id", express.json({ limit: "10mb" }), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const body = req.body || {};
+    if (!NETWORK_ID.test(id) || body.id !== id) {
+      return res.status(400).json({ ok: false, error: "id must be a UUID matching the URL" });
+    }
+    if (!Array.isArray(body.searches)) {
+      return res.status(400).json({ ok: false, error: "searches must be an array" });
+    }
+    const existing = await get("networks", id);
+    const network = {
+      id,
+      name: String(body.name || "Untitled network").trim().slice(0, 200) || "Untitled network",
+      createdAt: existing?.createdAt || Number(body.createdAt) || Date.now(),
+      updatedAt: Date.now(),
+      searches: body.searches,
+      networkBrief: body.networkBrief && typeof body.networkBrief === "object" ? body.networkBrief : null
+    };
+    await put("networks", network);
+    res.json({ ok: true, updatedAt: network.updatedAt, createdAt: network.createdAt });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
   }
 });
 

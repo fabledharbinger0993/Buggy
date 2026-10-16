@@ -78,6 +78,11 @@ await pool.query(`
     key  TEXT PRIMARY KEY,
     data TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS networks (
+    id   TEXT PRIMARY KEY,
+    data TEXT NOT NULL
+  );
 `);
 
 // ─── Store layout ─────────────────────────────────────────────────────────────
@@ -95,7 +100,8 @@ const STORES = {
   entities:   { table: "entities",     keyCol: "id",       dataCol: "data",
                 indexes: { by_session: '"sessionId"', by_name: "name" } },
   claims:     { table: "claims",       keyCol: "id",       dataCol: "data",
-                indexes: { by_session: '"sessionId"', by_status: '"corroborationStatus"' } }
+                indexes: { by_session: '"sessionId"', by_status: '"corroborationStatus"' } },
+  networks:   { table: "networks",     keyCol: "id",       dataCol: "data",  indexes: {} }
 };
 
 function store(storeName) {
