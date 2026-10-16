@@ -1,5 +1,5 @@
 // expansionEngine.js
-// Recursive, agentic research/expansion engine for Buggy
+// Recursive, agentic research/expansion engine for fungai
 // Maintains a dynamic queue of leads (entities, findings, connections)
 // Recursively spawns sub-searches for each lead, aggregates and merges results
 

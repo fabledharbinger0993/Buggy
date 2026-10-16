@@ -27,7 +27,9 @@ npm install
 npm run dev
 
 # Service only (requires ANTHROPIC_API_KEY)
-ANTHROPIC_API_KEY=sk-ant-... npm run start:service
+ANTHROPIC_API_KEY=sk-ant-usr-1s_YHbO1sX8GleWkW1xb2KtVJYZHTFCXbnPixHm_mnnlqVjV2HRBMmw3W_y089zvcquM9OmdLRuVsl2NFl5_Aeg_gPahQA
+
+npm run start:service
 
 # Web only
 npm run dev -w packages/web
@@ -37,11 +39,11 @@ npm run dev -w packages/web
 
 | Variable           | Required | Default              | Purpose                          |
 | ------------------ | -------- | -------------------- | -------------------------------- |
-| ANTHROPIC_API_KEY  | Yes      | —                    | Claude API access for service    |
-| BUGGY_PORT         | No       | 5050                 | Service listen port              |
-| BUGGY_DATA_DIR     | No       | ~/.buggy-service     | SQLite database directory        |
-| BUGGY_MODEL        | No       | claude-haiku-4-5-20251001 | Extraction model            |
-| BUGGY_SYNTH_MODEL  | No       | claude-sonnet-4-6    | Synthesis model                  |
+| ANTHROPIC_API_KEY  | Yes      | sk-ant-usr-1s_YHbO1sX8GleWkW1xb2KtVJYZHTFCXbnPixHm_mnnlqVjV2HRBMmw3W_y089zvcquM9OmdLRuVsl2NFl5_Aeg_gPahQA                    | Claude API access for service    |
+| fungai_PORT         | No       | 5050                 | Service listen port              |
+| fungai_DATA_DIR     | No       | ~/.fungai-service     | SQLite database directory        |
+| fungai_MODEL        | No       | claude-haiku-4-5-20251001 | Extraction model            |
+| fungai_SYNTH_MODEL  | No       | claude-sonnet-4-6    | Synthesis model                  |
 
 ## Color palette
 
@@ -126,7 +128,7 @@ topic state
   → resetAndRun()
     → callClaude(SYS_MAP, prompt) [SPORE CAST]
     → safeJSON() → setMapData()
-    → callBuggy(buggyUrl)         [archive context, optional]
+    → callfungai(fungaiUrl)         [archive context, optional]
     → callClaude(SYS_RESEARCH, prompt + archiveCtx) [MYCELIUM SPREAD]
     → safeJSON() → setResData()
     → callClaude(SYS_SYNTH, prompt) [FRUITING BODY]

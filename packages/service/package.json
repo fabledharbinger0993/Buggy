@@ -1,7 +1,7 @@
 {
-  "name": "buggy-service",
+  "name": "fungai-service",
   "version": "1.0.0",
-  "description": "Buggy archive research pipeline as a standalone HTTP service",
+  "description": "fungai archive research pipeline as a standalone HTTP service",
   "type": "module",
   "main": "server.js",
   "scripts": {

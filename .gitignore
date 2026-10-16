@@ -12,7 +12,7 @@ build/
 *.db
 *.db-shm
 *.db-wal
-~/.buggy-service/
+~/.fungai-service/
 
 # Logs
 logs/

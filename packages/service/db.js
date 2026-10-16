@@ -14,12 +14,12 @@ import { mkdirSync, existsSync } from "fs";
 import path from "path";
 import os from "os";
 
-const DATA_DIR = process.env.BUGGY_DATA_DIR || path.join(os.homedir(), ".buggy-service");
+const DATA_DIR = process.env.fungai_DATA_DIR || path.join(os.homedir(), ".fungai-service");
 if (!existsSync(DATA_DIR)) {
   mkdirSync(DATA_DIR, { recursive: true });
 }
 
-const DB_PATH = path.join(DATA_DIR, "buggy.db");
+const DB_PATH = path.join(DATA_DIR, "fungai.db");
 const db = new Database(DB_PATH);
 db.pragma("journal_mode = WAL");
 db.pragma("foreign_keys = ON");
@@ -229,8 +229,8 @@ export async function remove(storeName, key) {
 
 export function getDefaultSettings() {
   return {
-    ollamaEndpoint: process.env.BUGGY_OLLAMA_URL || "http://localhost:11434/api/generate",
-    ollamaModel: process.env.BUGGY_AGENT_MODEL || "qwen2.5-coder:7b",
+    ollamaEndpoint: process.env.fungai_OLLAMA_URL || "http://localhost:11434/api/generate",
+    ollamaModel: process.env.fungai_AGENT_MODEL || "qwen2.5-coder:7b",
     confidenceThreshold: 0.6,
     crawlDepth: 2,
     crawlDelaySeconds: 3,
@@ -241,7 +241,7 @@ export function getDefaultSettings() {
     chunkOverlapTokens: 200,
     tracingEnabled: true,
     tracingEndpoint: "http://localhost:4318/v1/traces",
-    tracingServiceName: "buggy-service",
+    tracingServiceName: "fungai-service",
     // Stage 1: batch entity extraction
     chunkBatchSize: 5,
     ollamaConcurrency: 1,

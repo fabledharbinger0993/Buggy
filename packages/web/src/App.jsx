@@ -650,7 +650,7 @@ async function fetchPriorIntelligence(topic) {
   return { memories, neighbors, memNodes, memEdges, memCtx, neighborCtx }
 }
 
-async function callBuggy(subject, sources) {
+async function callfungai(subject, sources) {
   try {
     const resp = await fetch('/search', {
       method: 'POST',
@@ -843,7 +843,7 @@ export default function App() {
       setStatusMsg('Spreading mycelium — querying archive sources…')
 
       let archiveCtx = ''
-      archiveCtx = await callBuggy(topic, map.archiveSources || [])
+      archiveCtx = await callfungai(topic, map.archiveSources || [])
       if (archiveCtx) setStatusMsg('Spreading mycelium — analysing archive context…')
 
       const resPrompt = [

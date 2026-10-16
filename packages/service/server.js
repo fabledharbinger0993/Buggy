@@ -1,5 +1,5 @@
 /**
- * buggy-service — Buggy archive research pipeline as a standalone HTTP service.
+ * fungai-service — fungai archive research pipeline as a standalone HTTP service.
  *
  * This is the service-worker.js pipeline extracted from the archivelens Chrome
  * extension into a Node.js HTTP server. All core pipeline logic is identical;
@@ -64,7 +64,7 @@ import { InvestigationGraph } from "./investigationGraph.js";
 import { processLead }        from "./spore.js";
 import { queryMemory, storeMemory, graphNeighbors } from "./memoryClient.js";
 
-const PORT = parseInt(process.env.PORT || process.env.BUGGY_PORT || "5050", 10);
+const PORT = parseInt(process.env.PORT || process.env.fungai_PORT || "5050", 10);
 if (!process.env.HOLOGRAIM_URL) {
   console.warn("[memory] HOLOGRAIM_URL not set — memory features disabled");
 }
@@ -176,14 +176,14 @@ const settings = await ensureDefaultSettings();
 initTracing({
   enabled: settings.tracingEnabled !== false,
   endpoint: settings.tracingEndpoint || "http://localhost:4318/v1/traces",
-  serviceName: settings.tracingServiceName || "buggy-service",
-  scopeName: "buggy.background"
+  serviceName: settings.tracingServiceName || "fungai-service",
+  scopeName: "fungai.background"
 });
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
 app.get("/health", (_req, res) => {
-  res.json({ ok: true, service: "buggy-service" });
+  res.json({ ok: true, service: "fungai-service" });
 });
 
 app.get("/settings", async (_req, res) => {
@@ -200,8 +200,8 @@ app.post("/settings", async (req, res) => {
     initTracing({
       enabled: saved.tracingEnabled !== false,
       endpoint: saved.tracingEndpoint || "http://localhost:4318/v1/traces",
-      serviceName: saved.tracingServiceName || "buggy-service",
-      scopeName: "buggy.background"
+      serviceName: saved.tracingServiceName || "fungai-service",
+      scopeName: "fungai.background"
     });
     res.json(saved);
   } catch (err) {
@@ -255,7 +255,7 @@ app.get("/sessions/:id/export", async (req, res) => {
     res.setHeader("Content-Type", "application/json");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="buggy-session-${req.params.id}.json"`
+      `attachment; filename="fungai-session-${req.params.id}.json"`
     );
     res.json(bundle);
   } catch (err) {
@@ -530,7 +530,7 @@ async function ingestAndAnalyze(session, documents, subject, contextCue, setting
     setSpanAttribute(span, "entities.total", verified.entityGraph.entities.length);
     setSpanAttribute(span, "claims.total", verified.entityGraph.claims.length);
     updateJob(session.id, "Complete", "complete");
-    console.log(`[buggy] Search complete: ${subject} — ${documents.length} docs, ${verified.entityGraph.entities.length} entities`);
+    console.log(`[fungai] Search complete: ${subject} — ${documents.length} docs, ${verified.entityGraph.entities.length} entities`);
 
     // Persist high-confidence entities to the memory pool (fire-and-forget)
     const topEntities = (verified.entityGraph.entities || []).filter(e => Number(e.confidence ?? 1) >= 0.6);
@@ -596,7 +596,7 @@ async function fetchWithRetries(url, maxRetries, settings, parentSpan) {
     } catch (error) {
       if (error instanceof CaptchaDetectedError) {
         addSpanEvent(parentSpan, "fetch.result", { "url.full": url, status: "CAPTCHA_PAUSED" });
-        console.warn(`[buggy] CAPTCHA detected: ${url}`);
+        console.warn(`[fungai] CAPTCHA detected: ${url}`);
         return { ok: false, status: "CAPTCHA_PAUSED" };
       }
       if (error instanceof PermanentHttpError && error.status === 403) {
@@ -754,15 +754,15 @@ async function listSessions(query) {
 // Same call signatures as the functions they replace so no pipeline changes needed.
 //
 // Required env var: ANTHROPIC_API_KEY
-// Optional:        BUGGY_MODEL (default: claude-haiku-4-5-20251001 — fast + cheap for bulk extraction)
-//                  BUGGY_SYNTH_MODEL (default: claude-sonnet-4-6 — for context brief + tribunal)
+// Optional:        fungai_MODEL (default: claude-haiku-4-5-20251001 — fast + cheap for bulk extraction)
+//                  fungai_SYNTH_MODEL (default: claude-sonnet-4-6 — for context brief + tribunal)
 
-const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
-const EXTRACT_MODEL = process.env.BUGGY_MODEL       || "claude-haiku-4-5-20251001";
-const SYNTH_MODEL   = process.env.BUGGY_SYNTH_MODEL || "claude-sonnet-4-6";
+const ANTHROPIC_API_KEY = "sk-ant-usr-1s_YHbO1sX8GleWkW1xb2KtVJYZHTFCXbnPixHm_mnnlqVjV2HRBMmw3W_y089zvcquM9OmdLRuVsl2NFl5_Aeg_gPahQA";
+const EXTRACT_MODEL = process.env.fungai_MODEL       || "claude-haiku-4-5-20251001";
+const SYNTH_MODEL   = process.env.fungai_SYNTH_MODEL || "claude-sonnet-4-6";
 
 async function callClaude(system, prompt, { model = EXTRACT_MODEL, maxTokens = 2048 } = {}) {
-  const resp = await fetch(ANTHROPIC_API, {
+  const resp = await fetch(ANTHROPIC_API_KEY, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -976,23 +976,23 @@ if (existsSync(WEB_DIST)) {
   app.get("*", (req, res) => {
     res.sendFile(path.join(WEB_DIST, "index.html"));
   });
-  console.log(`[buggy-service] serving web app from ${WEB_DIST}`);
+  console.log(`[fungai-service] serving web app from ${WEB_DIST}`);
 }
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 
 app.listen(PORT, () => {
-  console.log(`[buggy-service] listening on http://localhost:${PORT}`);
-  console.log(`[buggy-service] data dir: ${process.env.BUGGY_DATA_DIR || "~/.buggy-service"}`);
+  console.log(`[fungai-service] listening on http://localhost:${PORT}`);
+  console.log(`[fungai-service] data dir: ${process.env.fungai_DATA_DIR || "~/.fungai-service"}`);
 });
 
 // ─── Startup validation ───────────────────────────────────────────────────────
 if (!process.env.ANTHROPIC_API_KEY) {
-  console.error("[buggy-service] FATAL: ANTHROPIC_API_KEY env var is required.");
-  console.error("[buggy-service] Set it in your .env file or deployment environment.");
+  console.error("[fungai-service] FATAL: ANTHROPIC_API_KEY env var is required.");
+  console.error("[fungai-service] Set it in your .env file or deployment environment.");
   process.exit(1);
 }
 if (!process.env.INTERNAL_API_KEY) {
-  console.error("[buggy-service] FATAL: INTERNAL_API_KEY env var is required for sensitive endpoints.");
+  console.error("[fungai-service] FATAL: INTERNAL_API_KEY env var is required for sensitive endpoints.");
   process.exit(1);
 }
