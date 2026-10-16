@@ -9,13 +9,23 @@
 
 import pg from "pg";
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 10 });
+// FungAI's tables live in their own schema so they cannot collide with tables
+// other apps have created in `public` of a shared database (Railway's does).
+const SCHEMA = "fungai";
+
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 10,
+  options: `-c search_path=${SCHEMA}`
+});
 // An idle client losing its connection must not crash the process; the pool replaces it.
 pool.on("error", (err) => console.error("[db] idle Postgres client error:", err.message));
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
 await pool.query(`
+  CREATE SCHEMA IF NOT EXISTS ${SCHEMA};
+
   CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
