@@ -167,6 +167,23 @@ function requireApiKey(req, res, next) {
   return res.status(403).json({ error: "Forbidden" });
 }
 
+// Private site: every route below this point (API and the web app itself) needs the
+// internal API key or a logged-in session. Only the healthcheck and login flow are public.
+// Paths are matched exactly, so case or trailing-slash variants fall through to the gate.
+const PUBLIC_PATHS = new Set(["/health", "/auth/login", "/auth/session", "/auth/logout"]);
+const LOGIN_PAGE = path.join(__dirname, "login.html");
+
+app.use((req, res, next) => {
+  if (PUBLIC_PATHS.has(req.path)) return next();
+  const key = process.env.INTERNAL_API_KEY;
+  if (key && req.headers["x-api-key"] === key) return next();
+  if (hasValidSession(req)) return next();
+  if (req.method === "GET" && req.accepts(["json", "html"]) === "html") {
+    return res.status(401).sendFile(LOGIN_PAGE);
+  }
+  return res.status(401).json({ error: "Login required" });
+});
+
 // Active jobs: jobId → { status, progress, sessionId, traceId, updatedAt }
 const activeJobs = new Map();
 
